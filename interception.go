@@ -94,8 +94,8 @@ func checkInterceptionAtStart() {
 		return
 	}
 	logf("Interception filtre sürücüsü kurulu (%s): klavye uykudan sonra takılabilir", strings.Join(f, ", "))
-	notifyAction("Interception sürücüsü kurulu",
-		"Bu sürücü yüzünden klavye uykudan sonra takılır ve sadece yeniden başlatınca düzelir. Kaldırmak için arayüzü aç.",
+	notifyAction(L("Interception sürücüsü kurulu", "Interception driver is installed"),
+		L("Bu sürücü yüzünden klavye uykudan sonra takılır ve sadece yeniden başlatınca düzelir. Kaldırmak için arayüzü aç.", "Because of this driver the keyboard hangs after sleep and only a restart fixes it. Open the window to remove it."),
 		openGUI)
 }
 

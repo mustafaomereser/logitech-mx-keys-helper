@@ -39,6 +39,7 @@ MX Keys Mini on Bluetooth with an Intel Wireless Bluetooth adapter, Windows 11, 
 | `config.go` | Config schema (v2: `macros` is an array), migration from v1 (map of CID → rules), save/reload, log, state |
 | `api.go` | GUI HTTP server on 127.0.0.1:random; token → HttpOnly SameSite cookie; Host/Origin checks; opens an Edge `--app` window (when elevated, launches Edge de-elevated through explorer + a .vbs) |
 | `interception.go` | Detects the Interception filter driver (keyboard/mouse class UpperFilters `keyboard` / `mouse`), warns at start and in the GUI, removes it from the filter lists on request (elevated); repair is skipped while it is installed |
+| `lang.go` | `uiLang()` (config or Windows UI language) and `L(tr, en)` for Go-side UI text |
 | `gamemode.go` | Game mode: watcher goroutine sets an atomic flag (manual or foreground app in list); `gameBlocks` is called first in the keyboard hook |
 | `trayicon.go` | Battery tray icon / menu bitmap drawn in code (SDF anti-aliased canvas → DIB → CreateIconIndirect), taskbar/app theme from the registry, dark popup menus via uxtheme ordinals 135/136 |
 | `webview.go` | GUI window (no system caption: WM_NCCALCSIZE drops it, the page draws the title bar and forwards drag/min/max/close via `/api/window`; browser accelerators off via ICoreWebView2Settings3): own top-level window hosting WebView2 via raw COM vtables (runtime's EmbeddedBrowserWebView.dll → CreateWebViewEnvironmentWithOptionsInternal). UI thread is STA; opened through `wmOpenGUI`. Falls back to Edge `--app` (`openGUIOnce`). Process is per-monitor-v2 DPI aware |
@@ -56,7 +57,7 @@ Runtime data lives in `%APPDATA%\MXHelper\`: `config.json`, `state.json`, `log.t
 - Never block the HID++ read loop: `onEvent` must not make HID++ requests synchronously. Use goroutines or `queueMX`.
 - In PowerShell scripts, `$pid` is a read-only automatic variable; use another name.
 - CSS: `[hidden] { display: none !important; }` is required, because the overlay's `display: grid` would otherwise override `hidden`.
-- The user communicates in casual Turkish; keep UI strings in Turkish.
+- The user communicates in casual Turkish. UI source text is Turkish; English comes from `web/i18n.js` (exact-match dictionary + regex patterns, applied to every text node and title/placeholder/aria-label through a MutationObserver). **Any new UI text needs an entry there.** Go-side user-facing text (tray menu, notifications, API errors) uses `L(tr, en)` from `lang.go`; logs and the diagnostics report stay Turkish. `config.language`: "" = Windows UI language, `tr`, `en`.
 
 ## Possible next steps
 

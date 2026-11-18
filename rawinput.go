@@ -323,8 +323,8 @@ func (d *stuckDetector) onMediaKey(isMute bool) {
 		if mode == "auto" {
 			go repairer.repair("otomatik algılama")
 		} else {
-			notifyAction("MX Keys Mini takılmış olabilir",
-				"Sadece ses tuşları geliyor. Onarmak için bu bildirime tıkla ya da Mute tuşuna 3 kez bas.",
+			notifyAction(L("MX Keys Mini takılmış olabilir", "MX Keys Mini may be stuck"),
+				L("Sadece ses tuşları geliyor. Onarmak için bu bildirime tıkla ya da Mute tuşuna 3 kez bas.", "Only the media keys come through. Click this notification or press Mute 3 times to repair."),
 				func() { go repairer.repair("bildirim") })
 		}
 		return

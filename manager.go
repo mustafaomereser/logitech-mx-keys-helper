@@ -219,7 +219,7 @@ func (m *manager) readBattery() {
 	m.mu.Unlock()
 	c := getConfig()
 	if c.LowBatteryWarn > 0 && b.Percent <= c.LowBatteryWarn && !b.Charging {
-		notify("MX Keys Mini pili azaldı", fmt.Sprintf("Pil %%%d. Şarja takmayı unutma.", b.Percent))
+		notify(L("MX Keys Mini pili azaldı", "MX Keys Mini battery low"), fmt.Sprintf(L("Pil %%%d. Şarja takmayı unutma.", "Battery %d%%. Don't forget to charge it."), b.Percent))
 	}
 	trayRefresh()
 }
@@ -326,7 +326,7 @@ func (m *manager) onEvent(msg hidppMsg) {
 			if !prev[c] {
 				detector.onNormalKey() // diverted keys prove the keyboard is alive
 				if learn && !capturer.active() {
-					notify("Tuş öğrenme", fmt.Sprintf("CID 0x%04X (%s)\nTetikleyici olarak \"mx:0x%04X\" kullan.", c, cidName(c), c))
+					notify(L("Tuş öğrenme", "Key learning"), fmt.Sprintf(L("CID 0x%04X (%s)\nTetikleyici olarak \"mx:0x%04X\" kullan.", "CID 0x%04X (%s)\nUse \"mx:0x%04X\" as the trigger."), c, cidName(c), c))
 					logf("Öğrenme: CID 0x%04X basıldı", c)
 					continue
 				}

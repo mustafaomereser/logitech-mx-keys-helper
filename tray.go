@@ -179,13 +179,13 @@ func trayAdd() {
 
 func updateTray() {
 	conn, name, b, _, _ := mgr.snapshot()
-	tip := "MX Helper - bağlı değil"
+	tip := L("MX Helper - bağlı değil", "MX Helper - not connected")
 	if conn {
-		tip = name + " - bağlı"
+		tip = name + L(" - bağlı", " - connected")
 		if b.Known {
-			tip += fmt.Sprintf(" - pil %%%d", b.Percent)
+			tip += fmt.Sprintf(L(" - pil %%%d", " - battery %d%%"), b.Percent)
 			if b.Charging {
-				tip += " (şarjda)"
+				tip += L(" (şarjda)", " (charging)")
 			}
 		}
 	}
@@ -202,7 +202,7 @@ func updateTray() {
 		}
 	}
 	if gm, _ := gameModeActive(); gm {
-		tip += " - oyun modu"
+		tip += L(" - oyun modu", " - game mode")
 	}
 	u16copy(n.Tip[:], tip)
 	pShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&n)))
@@ -274,15 +274,15 @@ func showMenu() {
 	if name == "" {
 		name = "MX Keys Mini"
 	}
-	status := name + "\tbağlı değil"
+	status := name + L("\tbağlı değil", "\tnot connected")
 	if conn {
 		switch {
 		case !b.Known:
-			status = name + "\tbağlı"
+			status = name + L("\tbağlı", "\tconnected")
 		case b.Charging:
-			status = fmt.Sprintf("%s\t%%%d · şarjda", name, b.Percent)
+			status = fmt.Sprintf(L("%s\t%%%d · şarjda", "%s\t%d%% · charging"), name, b.Percent)
 		default:
-			status = fmt.Sprintf("%s\t%%%d", name, b.Percent)
+			status = fmt.Sprintf(L("%s\t%%%d", "%s\t%d%%"), name, b.Percent)
 		}
 	}
 	appendMenu(m, mfString, idStatus, status)
@@ -293,74 +293,74 @@ func showMenu() {
 	}
 	pSetMenuDefaultItm.Call(m, idStatus, 0) // bold; also what a double-click would do
 	if u := updateSnapshot(); u.Available {
-		label := "Güncelle: " + u.Latest
+		label := L("Güncelle: ", "Update: ") + u.Latest
 		if u.State == "downloading" || u.State == "installing" {
-			label = fmt.Sprintf("Güncelleniyor… %%%d", u.Progress)
+			label = fmt.Sprintf(L("Güncelleniyor… %%%d", "Updating… %d%%"), u.Progress)
 		}
 		appendMenu(m, mfString, idUpdate, label)
 	}
 	appendMenu(m, mfSeparator, 0, "")
-	appendMenu(m, mfString, idRepairNow, "Klavyeyi onar\tMute ×3")
+	appendMenu(m, mfString, idRepairNow, L("Klavyeyi onar\tMute ×3", "Repair keyboard\tMute ×3"))
 	if len(engine.runningIDs()) > 0 {
-		appendMenu(m, mfString, idStopAll, "Çalışan makroları durdur")
+		appendMenu(m, mfString, idStopAll, L("Çalışan makroları durdur", "Stop running macros"))
 	}
 	appendMenu(m, mfSeparator, 0, "")
 
 	bls, _, _ := pCreatePopupMenu.Call()
 	if blKnown {
-		appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 1)|mftRadio, idBlAuto, "Otomatik")
-		appendMenu(bls, check(bl.Enabled == 0)|mftRadio, idBlOff, "Kapalı")
+		appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 1)|mftRadio, idBlAuto, L("Otomatik", "Auto"))
+		appendMenu(bls, check(bl.Enabled == 0)|mftRadio, idBlOff, L("Kapalı", "Off"))
 		appendMenu(bls, mfSeparator, 0, "")
 		levels := bl.Levels
 		if levels <= 0 {
 			levels = 8
 		}
 		for i := 0; i < levels && i < 32; i++ {
-			appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 3 && int(bl.Level) == i)|mftRadio, uintptr(idBlLevelBase+i), fmt.Sprintf("Seviye %d", i))
+			appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 3 && int(bl.Level) == i)|mftRadio, uintptr(idBlLevelBase+i), fmt.Sprintf(L("Seviye %d", "Level %d"), i))
 		}
 		appendMenu(bls, mfSeparator, 0, "")
-		appendMenu(bls, mfString, idBlRules, "Kurallara dön")
+		appendMenu(bls, mfString, idBlRules, L("Kurallara dön", "Back to rules"))
 	} else {
-		appendMenu(bls, mfGrayed, 0, "Klavye bağlı değil")
+		appendMenu(bls, mfGrayed, 0, L("Klavye bağlı değil", "Keyboard not connected"))
 	}
-	blText := "Arka ışık"
+	blText := L("Arka ışık", "Backlight")
 	if blKnown {
 		switch {
 		case bl.Enabled == 0:
-			blText += "\tkapalı"
+			blText += L("\tkapalı", "\toff")
 		case bl.Mode() == 1:
-			blText += "\totomatik"
+			blText += L("\totomatik", "\tauto")
 		default:
-			blText += fmt.Sprintf("\tseviye %d", bl.Level)
+			blText += fmt.Sprintf(L("\tseviye %d", "\tlevel %d"), bl.Level)
 		}
 	}
 	appendMenu(m, mfPopup, bls, blText)
 
 	gm, _ := gameModeActive()
-	appendMenu(m, check(gm), idGameMode, "Oyun modu")
+	appendMenu(m, check(gm), idGameMode, L("Oyun modu", "Game mode"))
 
 	sub, _, _ := pCreatePopupMenu.Call()
-	appendMenu(sub, check(c.Repair.Auto == "ask")|mftRadio, idAutoAsk, "Bildirimle sor")
-	appendMenu(sub, check(c.Repair.Auto == "auto")|mftRadio, idAutoAuto, "Sormadan onar")
-	appendMenu(sub, check(c.Repair.Auto == "off")|mftRadio, idAutoOff, "Bir şey yapma (sadece Mute ×3)")
-	appendMenu(m, mfPopup, sub, "Takılma fark edilince")
+	appendMenu(sub, check(c.Repair.Auto == "ask")|mftRadio, idAutoAsk, L("Bildirimle sor", "Ask with a notification"))
+	appendMenu(sub, check(c.Repair.Auto == "auto")|mftRadio, idAutoAuto, L("Sormadan onar", "Repair without asking"))
+	appendMenu(sub, check(c.Repair.Auto == "off")|mftRadio, idAutoOff, L("Bir şey yapma (sadece Mute ×3)", "Do nothing (Mute ×3 only)"))
+	appendMenu(m, mfPopup, sub, L("Takılma fark edilince", "When a hang is detected"))
 	appendMenu(m, mfSeparator, 0, "")
 
 	mgr.mu.Lock()
 	learn := mgr.learnMode
 	mgr.mu.Unlock()
 	adv, _, _ := pCreatePopupMenu.Call()
-	appendMenu(adv, check(learn), idLearn, "Tuş öğrenme modu")
+	appendMenu(adv, check(learn), idLearn, L("Tuş öğrenme modu", "Key learning mode"))
 	appendMenu(adv, mfSeparator, 0, "")
-	appendMenu(adv, mfString, idDiag, "Tanılama raporu oluştur")
-	appendMenu(adv, mfString, idOpenLog, "Günlüğü aç")
-	appendMenu(adv, mfString, idOpenRepairLog, "Onarım günlüğünü aç")
-	appendMenu(adv, mfString, idOpenCfg, "config.json dosyasını aç")
-	appendMenu(m, mfPopup, adv, "Gelişmiş")
-	appendMenu(m, check(autostartEnabled()), idAutostart, "Windows açılışında başlat")
-	appendMenu(m, mfString, idOpenGUI, "Ayarlar…")
+	appendMenu(adv, mfString, idDiag, L("Tanılama raporu oluştur", "Create diagnostics report"))
+	appendMenu(adv, mfString, idOpenLog, L("Günlüğü aç", "Open log"))
+	appendMenu(adv, mfString, idOpenRepairLog, L("Onarım günlüğünü aç", "Open repair log"))
+	appendMenu(adv, mfString, idOpenCfg, L("config.json dosyasını aç", "Open config.json"))
+	appendMenu(m, mfPopup, adv, L("Gelişmiş", "Advanced"))
+	appendMenu(m, check(autostartEnabled()), idAutostart, L("Windows açılışında başlat", "Start with Windows"))
+	appendMenu(m, mfString, idOpenGUI, L("Ayarlar…", "Settings…"))
 	appendMenu(m, mfSeparator, 0, "")
-	appendMenu(m, mfString, idQuit, "Çıkış")
+	appendMenu(m, mfString, idQuit, L("Çıkış", "Quit"))
 
 	var pt point
 	pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
@@ -398,7 +398,7 @@ func handleCommand(id int) {
 		mgr.mu.Unlock()
 		mgr.setLearnMode(on)
 		if on {
-			notify("Tuş öğrenme modu açık", "Özel tuşlara (emoji, dikte, mikrofon, ekran görüntüsü...) bas; her birinin CID'si burada görünecek.")
+			notify(L("Tuş öğrenme modu açık", "Key learning mode on"), L("Özel tuşlara (emoji, dikte, mikrofon, ekran görüntüsü...) bas; her birinin CID'si burada görünecek.", "Press the special keys (emoji, dictation, mic, screenshot...); each one's CID shows up here."))
 		}
 	case id == idOpenCfg:
 		shellExecute("open", "notepad.exe", `"`+configPath()+`"`, 1)
@@ -451,7 +451,7 @@ func setConfigValue(path []string, value any) {
 	}
 	var root map[string]any
 	if json.Unmarshal(data, &root) != nil {
-		notify("Ayar dosyasında hata", "config.json okunamadı; elle düzelt.")
+		notify(L("Ayar dosyasında hata", "Error in the config file"), L("config.json okunamadı; elle düzelt.", "config.json couldn't be read; fix it by hand."))
 		return
 	}
 	cur := root

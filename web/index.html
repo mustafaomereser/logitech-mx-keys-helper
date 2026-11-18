@@ -406,6 +406,12 @@
     <header class="page-head"><div><h1>Ayarlar</h1><p>Onarım, başlangıç, cihaz eşleşmesi ve tanılama.</p></div></header>
 
     <div class="card">
+      <div class="rows">
+        <div class="row-item"><div class="row-label">Dil · Language<small>Arayüz, tepsi menüsü ve bildirimlerin dili.</small></div><div class="row-ctl right"><div class="seg" id="langSeg" translate="no"><button data-v="">Otomatik · Auto</button><button data-v="tr">Türkçe</button><button data-v="en">English</button></div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-head"><div><h2>Takılma onarımı</h2><p>Klavye sadece medya tuşlarına yanıt verdiğinde ne olsun.</p></div></div>
       <div class="rows">
         <div class="row-item"><div class="row-label">Takılmayı fark edince</div><div class="row-ctl right"><div class="seg" id="autoSeg"><button data-v="ask">Bildirimle sor</button><button data-v="auto">Sormadan onar</button><button data-v="off">Bir şey yapma</button></div></div></div>
@@ -486,6 +492,7 @@
 </div>
 <div class="toast" id="toast" hidden></div>
 
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -175,7 +175,7 @@ function actFields(a) {
 const trigMods = t => normTrig(t).split("+").slice(0, -1);
 
 const KEYLABEL = { esc: "Esc", delete: "Del", backspace: "⌫", tab: "Tab", capslock: "Caps", enter: "Enter", space: "Boşluk", left: "←", right: "→", up: "↑", down: "↓", ctrl: "Ctrl", alt: "Alt", shift: "Shift", win: "Win", playpause: "⏯", next: "⏭", prev: "⏮", mute: "🔇", volup: "🔊", voldown: "🔉", pgup: "PgUp", pgdn: "PgDn", printscreen: "PrtSc", plus: "=", minus: "-", comma: ",", period: "." };
-const keyLabel = p => MOUSE_TR[p] || KEYLABEL[p] || (p.length === 1 ? p.toUpperCase() : p.replace(/^f(\d+)$/, "F$1"));
+const keyLabel = p => i18n(MOUSE_TR[p] || KEYLABEL[p]) || (p.length === 1 ? p.toUpperCase() : p.replace(/^f(\d+)$/, "F$1"));
 
 function ctlName(cid) {
   const c = controls.find(x => x.cid === cid);
@@ -299,6 +299,19 @@ function liveKeys(on) {
 }
 document.addEventListener("visibilitychange", () => liveKeys(!document.hidden && currentTab() === "home"));
 
+// ---------- language ----------
+// st.lang is the effective language (config, or Windows' UI language on "auto").
+// Going back to Turkish needs a reload: English text was written over the Turkish DOM.
+function applyLang() {
+  if (!st || !st.lang) return;
+  if (st.lang === "en" && LANG !== "en") setLanguage("en");
+  else if (st.lang !== "en" && LANG === "en") { setLanguage("tr"); location.reload(); }
+  seg($("#langSeg"), cfg ? cfg.language || "" : "", async v => {
+    cfg.language = v;
+    if (await saveCfg()) refreshState();
+  });
+}
+
 // ---------- Interception warning ----------
 function renderInterception() {
   const box = $("#icpWarn");
@@ -395,6 +408,7 @@ function seg(el, value, onPick) {
 let lastRunning = "";
 async function refreshState() {
   try { st = await api("GET", "/api/state"); } catch { return; }
+  applyLang();
   $("#ver").textContent = $("#verTb").textContent = st.version;
   const on = st.connected;
   $("#devPill").classList.toggle("on", on);
@@ -1249,7 +1263,7 @@ function fieldsHTML(a, i) {
     case "shell": return inp("cmd", "ör. shutdown /a", "grow");
     case "http": return `${sel("method", ["GET", "POST", "PUT", "DELETE"].map(m => [m, m]), "GET")} ${inp("url", "https://…", "grow")} ${inp("body", "gövde (isteğe bağlı)")}`;
     case "backlight": return sel("value", [["toggle", "Aç/kapa"], ["up", "Artır"], ["down", "Azalt"], ["auto", "Otomatik"], ["off", "Kapat"], ...[0, 1, 2, 3, 4, 5, 6, 7].map(n => [String(n), "Seviye " + n])], "toggle");
-    case "gamemode": return sel("value", [["toggle", "Aç/kapa"], ["on", "Aç"], ["off", "Kapat"]], "toggle");
+    case "gamemode": return sel("value", [["toggle", "Aç/kapa"], ["on", "Açık"], ["off", "Kapalı"]], "toggle");
     case "repair": return '<span class="small">Bluetooth takılma onarımını başlatır</span>';
     default: return "";
   }
@@ -1283,7 +1297,7 @@ function renderActions() {
       const ms = acts.slice(s.from, s.to).reduce((x, a) => x + (a.type === "delay" ? a.ms || 0 : 0), 0);
       return `<div class="act thin" data-i="${s.from}">
         <span class="grip"></span><div class="idx">${s.from + 1}</div><div class="aic m">${icon("i-move", "sm")}</div><div class="lbl">Fare yolu</div>
-        <div class="fields">${s.moves} nokta · ${fmtMs(ms)} <button class="btn sm ghost" data-expand="1">Aç</button></div>
+        <div class="fields">${s.moves} nokta · ${fmtMs(ms)} <button class="btn sm ghost" data-expand="1">Göster</button></div>
         <div class="tools"><button class="del" data-delpath="${s.from}:${s.to}" title="Sil">${icon("i-trash", "sm")}</button></div></div>`;
     }
     const i = s.i, a = acts[i], t = TYPES[a.type] || { l: a.type, ic: "i-bolt", c: "" };
@@ -1761,6 +1775,8 @@ buildKB($("#kbAssign"), true);
 buildKB($("#kbLight"), false);
 
 (async () => {
+  // language first, so text built from parts (e.g. "Ctrl+Sol tık") comes out translated
+  try { st = await api("GET", "/api/state"); applyLang(); } catch {}
   try { await loadAll(); } catch (e) { toast("Bağlantı hatası: " + e.message, true); }
   await refreshState();
   route();

@@ -321,7 +321,7 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; c
 .mbtn[data-trig=wheelup] { top: 58px; }
 .mbtn[data-trig=middle] { left: 50%; transform: translateX(-50%); top: 76px; width: 44px; }
 .mbtn[data-trig=wheeldown] { top: 99px; }
-.mbtn[data-trig=mouse5], .mbtn[data-trig=mouse4] { left: 4px; width: 38px; font-size: 10.5px; }
+.mbtn[data-trig=mouse5], .mbtn[data-trig=mouse4] { left: 2px; min-width: 38px; padding: 2px 4px; font-size: 10.5px; }
 .mbtn[data-trig=mouse5] { top: 114px; }
 .mbtn[data-trig=mouse4] { top: 134px; }
 .mouse-note { font-size: 10.5px; color: var(--faint); text-align: center; margin-top: 14px; line-height: 1.35; }

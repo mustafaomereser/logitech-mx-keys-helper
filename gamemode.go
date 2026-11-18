@@ -43,7 +43,7 @@ func watchGameMode() {
 			gameReason.Store(reason)
 			if on {
 				logf("Oyun modu açıldı (%s)", reason)
-				notify("Oyun modu açık", gameModeSummary(c.GameMode))
+				notify(L("Oyun modu açık", "Game mode on"), gameModeSummary(c.GameMode))
 			} else {
 				logf("Oyun modu kapandı")
 			}
@@ -58,7 +58,7 @@ func watchGameMode() {
 func gameModeSummary(g GameMode) string {
 	var parts []string
 	if g.BlockWin {
-		parts = append(parts, "Windows tuşu")
+		parts = append(parts, L("Windows tuşu", "Windows key"))
 	}
 	if g.BlockAltTab {
 		parts = append(parts, "Alt+Tab")
@@ -66,7 +66,7 @@ func gameModeSummary(g GameMode) string {
 	if g.BlockAltF4 {
 		parts = append(parts, "Alt+F4")
 	}
-	return "Kilitli: " + strings.Join(parts, ", ")
+	return L("Kilitli: ", "Locked: ") + strings.Join(parts, ", ")
 }
 
 // gameBlocks reports whether a key press must be swallowed. Called from the

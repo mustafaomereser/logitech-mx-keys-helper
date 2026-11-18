@@ -145,10 +145,10 @@ func fetchLatest() (updateInfo, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == 404 {
-		return updateInfo{}, errors.New("henüz yayınlanmış sürüm yok")
+		return updateInfo{}, errors.New(L("henüz yayınlanmış sürüm yok", "no release published yet"))
 	}
 	if resp.StatusCode != 200 {
-		return updateInfo{}, fmt.Errorf("GitHub yanıtı: %s", resp.Status)
+		return updateInfo{}, fmt.Errorf(L("GitHub yanıtı: %s", "GitHub replied: %s"), resp.Status)
 	}
 	var rel struct {
 		Tag    string `json:"tag_name"`
@@ -197,7 +197,7 @@ func watchUpdates() {
 					logf("Yeni sürüm %s, otomatik yükleniyor", info.Latest)
 					go applyUpdate()
 				} else {
-					notifyAction("MX Helper güncellemesi", fmt.Sprintf("%s sürümü hazır. Yüklemek için tıkla.", info.Latest), func() { go applyUpdate() })
+					notifyAction(L("MX Helper güncellemesi", "MX Helper update"), fmt.Sprintf(L("%s sürümü hazır. Yüklemek için tıkla.", "%s is ready. Click to install."), info.Latest), func() { go applyUpdate() })
 				}
 			}
 		}
@@ -224,7 +224,7 @@ func applyUpdate() {
 
 	info, err := fetchLatest()
 	if err == nil && !info.Available {
-		err = errors.New("zaten en güncel sürüm")
+		err = errors.New(L("zaten en güncel sürüm", "already the latest version"))
 	}
 	if err == nil {
 		updater.Lock()
@@ -235,7 +235,7 @@ func applyUpdate() {
 	if err != nil {
 		setUpdateState("error", err.Error(), 0)
 		logf("Güncelleme başarısız: %v", err)
-		notify("Güncelleme yapılamadı", err.Error())
+		notify(L("Güncelleme yapılamadı", "Update failed"), err.Error())
 	}
 }
 
@@ -253,7 +253,7 @@ func installUpdate(info updateInfo) error {
 		}
 	}
 	if len(want) != 64 {
-		return errors.New("sürümde SHA-256 özeti yok; güvenlik için yüklenmedi")
+		return errors.New(L("sürümde SHA-256 özeti yok; güvenlik için yüklenmedi", "the release has no SHA-256 checksum; not installed for safety"))
 	}
 
 	exe, err := os.Executable()
@@ -273,7 +273,7 @@ func installUpdate(info updateInfo) error {
 	os.Remove(old)
 	if err := os.Rename(exe, old); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("exe değiştirilemedi (klasöre yazma izni?): %w", err)
+		return fmt.Errorf(L("exe değiştirilemedi (klasöre yazma izni?): %w", "couldn't replace the exe (folder write permission?): %w"), err)
 	}
 	if err := os.Rename(tmp, exe); err != nil {
 		os.Rename(old, exe)
@@ -304,14 +304,14 @@ func download(url, dst string, size int64, wantHex string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("indirme: %s", resp.Status)
+		return fmt.Errorf(L("indirme: %s", "download: %s"), resp.Status)
 	}
 	if size <= 0 {
 		size = resp.ContentLength
 	}
 	f, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("exe klasörüne yazılamıyor: %w", err)
+		return fmt.Errorf(L("exe klasörüne yazılamıyor: %w", "can't write to the exe's folder: %w"), err)
 	}
 	h := sha256.New()
 	buf := make([]byte, 64<<10)
@@ -327,7 +327,7 @@ func download(url, dst string, size int64, wantHex string) error {
 			n += int64(k)
 			if n > 200<<20 {
 				f.Close()
-				return errors.New("dosya beklenenden büyük")
+				return errors.New(L("dosya beklenenden büyük", "file larger than expected"))
 			}
 			if size > 0 {
 				setUpdateState("downloading", "", int(n*100/size))
@@ -345,7 +345,7 @@ func download(url, dst string, size int64, wantHex string) error {
 		return err
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != wantHex {
-		return errors.New("indirilen dosyanın özeti tutmuyor; yüklenmedi")
+		return errors.New(L("indirilen dosyanın özeti tutmuyor; yüklenmedi", "the downloaded file's checksum doesn't match; not installed"))
 	}
 	return nil
 }
@@ -371,7 +371,7 @@ func finishUpdate() {
 				time.Sleep(time.Second)
 			}
 			time.Sleep(3 * time.Second)
-			notify("MX Helper güncellendi", "Şu anki sürüm: "+version)
+			notify(L("MX Helper güncellendi", "MX Helper updated"), L("Şu anki sürüm: ", "Current version: ")+version)
 		}()
 		return
 	}

@@ -161,6 +161,7 @@ type Config struct {
 	Update    struct {
 		Mode string `json:"mode"` // ask | auto | off
 	} `json:"update"`
+	Language string `json:"language,omitempty"` // "" (Windows' language) | tr | en
 }
 
 // mxTriggerCIDs returns the MX key CIDs used by enabled macros.
@@ -393,12 +394,12 @@ func watchConfig() {
 			cfgMu.Lock()
 			cfgMtime = st.ModTime()
 			cfgMu.Unlock()
-			notify("Ayar dosyasında hata", err.Error())
+			notify(L("Ayar dosyasında hata", "Error in the config file"), err.Error())
 			logf("%v", err)
 			continue
 		}
 		logf("Ayarlar yeniden yüklendi")
-		notify("MX Helper", "Ayarlar yeniden yüklendi.")
+		notify("MX Helper", L("Ayarlar yeniden yüklendi.", "Settings reloaded."))
 		onConfigChanged()
 	}
 }
@@ -406,8 +407,8 @@ func watchConfig() {
 // ---------- persistent state ----------
 
 type State struct {
-	LastWorkingLevel int            `json:"last_working_level"`
-	Successes        map[string]int `json:"successes"`
+	LastWorkingLevel int             `json:"last_working_level"`
+	Successes        map[string]int  `json:"successes"`
 	Backlight        *savedBacklight `json:"backlight,omitempty"`
 }
 

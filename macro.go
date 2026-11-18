@@ -132,7 +132,7 @@ func (e *macroEngine) press(trigger string, replay func()) bool {
 	e.mu.Unlock()
 	if trigger == stop && stop != "" {
 		e.stopAll()
-		notify("MX Helper", "Tüm makrolar durduruldu.")
+		notify("MX Helper", L("Tüm makrolar durduruldu.", "All macros stopped."))
 		heldMu.Lock()
 		held[trigger] = &heldState{fired: true, swallow: true}
 		heldMu.Unlock()
@@ -487,7 +487,7 @@ func runSimpleAction(a Action) {
 			resp, err := cl.Do(req)
 			if err != nil {
 				logf("HTTP hatası: %v", err)
-				notify("HTTP makrosu başarısız", err.Error())
+				notify(L("HTTP makrosu başarısız", "HTTP macro failed"), err.Error())
 				return
 			}
 			resp.Body.Close()

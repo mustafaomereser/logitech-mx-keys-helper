@@ -130,9 +130,9 @@ func (r *repairState) repair(reason string) {
 		// slots of the Interception driver are only freed by a reboot; no repair level helps
 		logf("Onarım atlandı (%s): Interception sürücüsü yüzünden sadece yeniden başlatma düzeltir", reason)
 		if present {
-			notifyAction("Onarım işe yaramaz: Interception kurulu", "Klavye bu sürücü yüzünden takıldı; sadece yeniden başlatmak düzeltir. Kalıcı çözüm için arayüzden kaldır.", openGUI)
+			notifyAction(L("Onarım işe yaramaz: Interception kurulu", "Repair won't help: Interception is installed"), L("Klavye bu sürücü yüzünden takıldı; sadece yeniden başlatmak düzeltir. Kalıcı çözüm için arayüzden kaldır.", "The keyboard hung because of this driver; only a restart fixes it. Remove it from the window for a permanent fix."), openGUI)
 		} else {
-			notify("Bilgisayarı yeniden başlat", "Interception kaldırıldı ama hâlâ bellekte; klavye yeniden başlatınca düzelir ve bir daha takılmaz.")
+			notify(L("Bilgisayarı yeniden başlat", "Restart the computer"), L("Interception kaldırıldı ama hâlâ bellekte; klavye yeniden başlatınca düzelir ve bir daha takılmaz.", "Interception was removed but is still in memory; the keyboard recovers after a restart and won't hang again."))
 		}
 		return
 	}
@@ -158,9 +158,9 @@ func (r *repairState) repair(reason string) {
 	r.pendingAt, r.pendingLv = time.Now(), level
 	r.mu.Unlock()
 
-	desc := map[int]string{1: "klavyenin Bluetooth HID servisi yeniden başlatılıyor", 2: "Bluetooth adaptörü kapatılıp açılıyor", 3: "Bluetooth servisleri ve adaptör sıfırlanıyor"}[level]
+	desc := map[int]string{1: L("klavyenin Bluetooth HID servisi yeniden başlatılıyor", "restarting the keyboard's Bluetooth HID service"), 2: L("Bluetooth adaptörü kapatılıp açılıyor", "turning Bluetooth off and on"), 3: L("Bluetooth servisleri ve adaptör sıfırlanıyor", "resetting the Bluetooth services and adapter")}[level]
 	logf("Onarım başladı (%s): seviye %d", reason, level)
-	notify(fmt.Sprintf("MX Keys Mini onarılıyor (seviye %d/3)", level), desc+". Birkaç saniye sonra yazmayı dene; olmazsa tekrar Mute x3.")
+	notify(fmt.Sprintf(L("MX Keys Mini onarılıyor (seviye %d/3)", "Repairing MX Keys Mini (level %d/3)"), level), desc+L(". Birkaç saniye sonra yazmayı dene; olmazsa tekrar Mute x3.", ". Try typing in a few seconds; if it doesn't work, Mute x3 again."))
 	detector.mu.Lock()
 	detector.repairPending = true
 	detector.mu.Unlock()
@@ -168,7 +168,7 @@ func (r *repairState) repair(reason string) {
 	err := runPowerShell(psScript(level, mgr.currentPID(), filepath.Join(appDir(), "repair.log")), true)
 	if err != nil {
 		logf("Onarım çalıştırılamadı: %v", err)
-		notify("Onarım çalıştırılamadı", "Yönetici izni gerekli. Menüden 'Windows açılışında yönetici olarak başlat'ı açarsan bir daha sorulmaz.")
+		notify(L("Onarım çalıştırılamadı", "Repair couldn't run"), L("Yönetici izni gerekli. Menüden 'Windows açılışında yönetici olarak başlat'ı açarsan bir daha sorulmaz.", "Administrator permission is needed. Turn on 'Start with Windows' and it won't ask again."))
 	}
 	r.mu.Lock()
 	r.running = false
@@ -193,7 +193,7 @@ func (r *repairState) markSuccess() {
 	st.Successes[fmt.Sprint(lv)]++
 	saveState(st)
 	logf("Onarım işe yaradı: seviye %d", lv)
-	notify("MX Keys Mini düzeldi", fmt.Sprintf("Seviye %d işe yaradı; bir dahakine doğrudan bununla başlayacağım.", lv))
+	notify(L("MX Keys Mini düzeldi", "MX Keys Mini is back"), fmt.Sprintf(L("Seviye %d işe yaradı; bir dahakine doğrudan bununla başlayacağım.", "Level %d worked; next time it starts with that one."), lv))
 }
 
 // ---------- autostart via Task Scheduler (elevated, works on battery, no time limit) ----------

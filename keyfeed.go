@@ -59,7 +59,7 @@ func subscribeKeys() (chan keyEvent, func()) {
 func apiKeyStream(w http.ResponseWriter, r *http.Request) {
 	fl, ok := w.(http.Flusher)
 	if !ok {
-		httpErr(w, "akış desteklenmiyor")
+		httpErr(w, L("akış desteklenmiyor", "streaming not supported"))
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")

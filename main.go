@@ -39,7 +39,7 @@ func main() {
 	}
 	if err := loadConfig(); err != nil {
 		logf("%v", err)
-		notify("Ayar dosyasında hata", err.Error())
+		notify(L("Ayar dosyasında hata", "Error in the config file"), err.Error())
 	}
 	firstRun := os.Getenv("MXHELPER_FIRSTRUN") == "1"
 	engine.rebuild()
@@ -66,7 +66,7 @@ func main() {
 		}
 		if len(found) > 0 {
 			logf("Çalışan Logitech yazılımları: %v", found)
-			notify("Logitech yazılımı açık", "Options+ / G HUB açıkken özel tuş ve ışık ayarları çakışabilir. Sorun olursa onları kapat.")
+			notify(L("Logitech yazılımı açık", "Logitech software running"), L("Options+ / G HUB açıkken özel tuş ve ışık ayarları çakışabilir. Sorun olursa onları kapat.", "With Options+ / G HUB running, special keys and light settings may conflict. Close them if something goes wrong."))
 		}
 	}()
 	runUI()

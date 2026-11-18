@@ -1,5 +1,8 @@
 # Değişiklikler
 
+## v0.3.8
+- **İngilizce dil desteği.** Ayarlar → Dil: *Otomatik* (Windows'un diline göre), *Türkçe* ya da *English*. Arayüz, tepsi menüsü, bildirimler ve hata mesajları seçilen dilde. Günlük ve tanılama raporu Türkçe kalır.
+
 ## v0.3.7
 - **Interception uyarısı:** Interception filtre sürücüsü kuruluysa (bazı makro ve oyun araçları kurar) MX Helper açılışta bildirim verir ve Genel bakış'ta uyarı gösterir. Bu sürücü Bluetooth klavye her uykudan uyandığında bir yer harcar; yerler bitince klavye yeniden başlatana kadar çalışmaz. "Sadece ses tuşları çalışıyor" takılmasının asıl sebebi buydu.
   - Uyarıdaki **Kaldır** düğmesi Interception'ı klavye/fare sürücü listesinden çıkarır (yönetici izni ister; Windows'un kendi sürücüleri kalır). Ardından bilgisayarı yeniden başlatmak gerekir.

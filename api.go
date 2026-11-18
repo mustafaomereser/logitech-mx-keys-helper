@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"net"
@@ -90,7 +91,7 @@ func startGUIServer() error {
 		b, _ := io.ReadAll(io.LimitReader(r.Body, 4<<20))
 		c, err := parseConfig(b)
 		if err != nil {
-			httpErr(w, "JSON hatası: "+err.Error())
+			httpErr(w, L("JSON hatası: ", "JSON error: ")+err.Error())
 			return
 		}
 		if err := saveConfig(c); err != nil {
@@ -133,7 +134,7 @@ func startGUIServer() error {
 	api("POST /api/capture", func(w http.ResponseWriter, r *http.Request) {
 		t, ok := capturer.wait(15 * time.Second)
 		if !ok {
-			httpErr(w, "Zaman aşımı: 15 saniye içinde tuşa basılmadı.")
+			httpErr(w, L("Zaman aşımı: 15 saniye içinde tuşa basılmadı.", "Timed out: no key pressed within 15 seconds."))
 			return
 		}
 		writeJSON(w, map[string]any{"trigger": t})
@@ -229,7 +230,7 @@ func startGUIServer() error {
 	})
 	api("POST /api/interception/remove", func(w http.ResponseWriter, r *http.Request) {
 		if !removeInterception() {
-			httpErr(w, "Kaldırılamadı: yönetici izni verilmedi ya da kayıt defteri değiştirilemedi.")
+			httpErr(w, L("Kaldırılamadı: yönetici izni verilmedi ya da kayıt defteri değiştirilemedi.", "Couldn't remove it: administrator permission was not given or the registry couldn't be changed."))
 			return
 		}
 		writeJSON(w, map[string]bool{"ok": true})
@@ -376,8 +377,9 @@ type apiStateResp struct {
 	GameReason string         `json:"game_mode_reason"`
 	Update     updateInfo     `json:"update"`
 	// Interception filter driver installed / removed this session (reboot pending)
-	Interception        bool `json:"interception"`
-	InterceptionRemoved bool `json:"interception_removed"`
+	Lang                string `json:"lang"` // effective UI language: tr | en
+	Interception        bool   `json:"interception"`
+	InterceptionRemoved bool   `json:"interception_removed"`
 }
 
 var autostartCache struct {
@@ -404,7 +406,7 @@ func apiState(w http.ResponseWriter, r *http.Request) {
 	gm, gr := gameModeActive()
 	icp, icpGone := interceptionState()
 	writeJSON(w, apiStateResp{
-		Interception: icp, InterceptionRemoved: icpGone,
+		Interception: icp, InterceptionRemoved: icpGone, Lang: uiLang(),
 		GameMode: gm, GameReason: gr, Update: updateSnapshot(),
 		Version: version, Connected: conn, Name: name, Battery: b,
 		Backlight: map[string]any{"known": blKnown, "enabled": bl.Enabled != 0, "mode": bl.Mode(), "level": bl.Level, "levels": bl.Levels},
@@ -423,7 +425,7 @@ func apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, m := range c.Macros {
 		if m.Enabled && normalizeTrigger(m.Trigger) == "" {
-			httpErr(w, "\""+m.Name+"\" makrosunun tetikleyicisi geçersiz: "+m.Trigger)
+			httpErr(w, fmt.Sprintf(L("\"%s\" makrosunun tetikleyicisi geçersiz: %s", "Macro \"%s\" has an invalid trigger: %s"), m.Name, m.Trigger))
 			return
 		}
 	}
