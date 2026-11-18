@@ -1,0 +1,42 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Vet
+        run: GOOS=windows GOARCH=amd64 go vet ./...
+
+      - name: Build
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then VER="$GITHUB_REF_NAME"; else VER="dev-${GITHUB_SHA::7}"; fi
+          mkdir -p dist
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -H=windowsgui -X main.version=$VER" -o dist/MXHelper.exe .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MXHelper
+          path: dist/MXHelper.exe
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/MXHelper.exe
+          generate_release_notes: true

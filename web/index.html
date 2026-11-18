@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MX Helper</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<aside class="side">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div>
+      <div class="brand-name">MX Helper</div>
+      <div class="brand-sub" id="ver">—</div>
+    </div>
+  </div>
+  <nav id="nav">
+    <button data-tab="home" class="active"><i>◉</i>Genel</button>
+    <button data-tab="macros"><i>⌘</i>Makrolar</button>
+    <button data-tab="light"><i>☀</i>Arka ışık</button>
+    <button data-tab="adv"><i>⚙</i>Gelişmiş</button>
+  </nav>
+  <div class="side-foot">
+    <div class="dev" id="devPill"><span class="dot"></span><span id="devText">Bağlantı bekleniyor</span></div>
+    <div class="batt" id="battMini"></div>
+  </div>
+</aside>
+
+<main>
+  <!-- HOME -->
+  <section id="tab-home" class="tab active">
+    <header class="page-head">
+      <h1>Genel</h1>
+      <p>Klavye durumu ve takılma onarımı</p>
+    </header>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Klavye</div>
+        <div class="big" id="homeName">—</div>
+        <div class="muted" id="homeConn">—</div>
+        <div class="battbar"><div id="battFill"></div></div>
+        <div class="row between"><span class="muted">Pil</span><b id="battText">—</b></div>
+      </div>
+
+      <div class="card accent">
+        <div class="card-title">Takılma onarımı</div>
+        <p class="muted small">Klavye sadece ses tuşlarına yanıt veriyorsa <kbd>Mute</kbd> tuşuna <b>3 kez</b> bas ya da aşağıdaki düğmeye tıkla.</p>
+        <button class="btn primary wide" id="repairBtn">Klavyeyi şimdi onar</button>
+        <div class="row between mt">
+          <span class="muted">İşe yarayan son seviye</span><b id="repairLvl">—</b>
+        </div>
+        <div class="row between">
+          <span class="muted">Başarılı onarımlar</span><b id="repairCnt">—</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Onarım ayarları</div>
+      <div class="field">
+        <label>Takılmayı fark edince</label>
+        <div class="seg" id="autoSeg">
+          <button data-v="ask">Bildirimle sor</button>
+          <button data-v="auto">Sormadan onar</button>
+          <button data-v="off">Bir şey yapma</button>
+        </div>
+      </div>
+      <div class="field inline">
+        <label for="mediaN">Kaç ses tuşu basımından sonra şüphelensin</label>
+        <input type="number" id="mediaN" min="1" max="10" class="num">
+      </div>
+      <div class="field inline">
+        <label for="lowWarn">Düşük pil uyarısı (%)</label>
+        <input type="number" id="lowWarn" min="0" max="50" class="num">
+      </div>
+      <div class="row gap">
+        <button class="btn" id="saveHome">Kaydet</button>
+        <button class="btn ghost" id="resetRepair">Onarım geçmişini sıfırla</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Başlangıç</div>
+      <label class="switch-row">
+        <span>
+          <b>Windows açılışında yönetici olarak başlat</b>
+          <span class="muted small block">Onarım her seferinde yönetici izni sormaz; oyunlarda da makrolar çalışır.</span>
+        </span>
+        <span class="switch"><input type="checkbox" id="autostart"><span></span></span>
+      </label>
+      <div class="muted small" id="elevInfo"></div>
+      <div class="warn" id="logiWarn" hidden></div>
+    </div>
+  </section>
+
+  <!-- MACROS -->
+  <section id="tab-macros" class="tab">
+    <header class="page-head row between">
+      <div>
+        <h1>Makrolar</h1>
+        <p>Tuş kombinasyonu, fare yan tuşu veya MX özel tuşuna bağlı makrolar</p>
+      </div>
+      <div class="row gap">
+        <button class="btn ghost" id="stopAll" title="ctrl+alt+pause">Çalışanları durdur</button>
+        <div class="dropdown">
+          <button class="btn primary" id="newMacroBtn">+ Yeni makro</button>
+          <div class="menu" id="newMenu" hidden>
+            <button data-t="turboClick"><b>Turbo tık</b><span>Basılı tuttukça hızlı sol tık</span></button>
+            <button data-t="turboKey"><b>Turbo tuş</b><span>Basılı tuttukça bir tuşa bas-çek</span></button>
+            <button data-t="record"><b>Kayıtlı makro</b><span>Tuş ve tıklamalarını kaydet, tekrar oynat</span></button>
+            <button data-t="text"><b>Metin yaz</b><span>Kısayolla hazır metin</span></button>
+            <button data-t="run"><b>Program / site aç</b><span>Uygulama, klasör veya URL</span></button>
+            <button data-t="blank"><b>Boş</b><span>Sıfırdan</span></button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="macro-layout">
+      <div class="macro-list" id="macroList"></div>
+      <div class="editor card" id="editor">
+        <div class="empty" id="editorEmpty">
+          <div class="empty-icon">⌘</div>
+          <p>Soldan bir makro seç veya yeni bir tane oluştur.</p>
+        </div>
+        <div id="editorBody" hidden>
+          <div class="row gap">
+            <input id="mName" class="title-input" placeholder="Makro adı">
+            <label class="switch" title="Etkin"><input type="checkbox" id="mEnabled"><span></span></label>
+          </div>
+
+          <div class="field">
+            <label>Tetikleyici</label>
+            <div class="row gap">
+              <div class="trigger" id="mTriggerView">—</div>
+              <button class="btn" id="captureBtn">Yakala</button>
+              <input id="mTrigger" class="mono grow" placeholder="ör. ctrl+alt+k, f13, mouse5, mx:0x0108">
+            </div>
+            <div class="muted small">Klavye kombinasyonu, fare yan tuşları (mouse4 / mouse5 / middle) veya MX özel tuşları. Sol/sağ tık tetikleyici olamaz.</div>
+          </div>
+
+          <div class="field">
+            <label>Çalışma şekli</label>
+            <div class="seg" id="modeSeg">
+              <button data-v="press">Bir kez çalıştır</button>
+              <button data-v="hold">Basılı tuttukça tekrarla</button>
+              <button data-v="toggle">Bas başlat / bas durdur</button>
+            </div>
+          </div>
+
+          <div class="grid3">
+            <div class="field" id="fInterval">
+              <label for="mInterval">Tekrar aralığı (ms)</label>
+              <input type="number" id="mInterval" min="1" class="num">
+              <div class="muted small" id="rateHint"></div>
+            </div>
+            <div class="field" id="fRepeat">
+              <label for="mRepeat">Kaç kez</label>
+              <input type="number" id="mRepeat" min="1" class="num">
+            </div>
+            <div class="field span2">
+              <label for="mApp">Sadece bu programda</label>
+              <div class="row gap">
+                <input id="mApp" class="mono grow" placeholder="hepsi (ör. Brawlhalla.exe)">
+                <button class="btn small" id="pickApp" title="3 saniye içinde hedef pencereye geç">Seç</button>
+              </div>
+            </div>
+          </div>
+
+          <label class="check"><input type="checkbox" id="mPass"> Tetikleyici tuş da normal işlevini yapsın</label>
+
+          <div class="field">
+            <div class="row between">
+              <label>Eylemler</label>
+              <div class="row gap">
+                <label class="check small"><input type="checkbox" id="recMouse" checked> Tıklamaları kaydet</label>
+                <label class="check small"><input type="checkbox" id="recDelays" checked> Beklemeleri kaydet</label>
+                <button class="btn small rec" id="recBtn">● Kayda başla</button>
+              </div>
+            </div>
+            <div id="actions" class="actions"></div>
+            <div class="row gap">
+              <select id="addType" class="sel">
+                <option value="click">Fare tıkla</option>
+                <option value="keys">Tuşa bas (kombinasyon)</option>
+                <option value="keydown">Tuşu basılı tut</option>
+                <option value="keyup">Tuşu bırak</option>
+                <option value="mousedown">Fare tuşunu basılı tut</option>
+                <option value="mouseup">Fare tuşunu bırak</option>
+                <option value="delay">Bekle</option>
+                <option value="text">Metin yaz</option>
+                <option value="run">Program / dosya aç</option>
+                <option value="url">Web adresi aç</option>
+                <option value="shell">Komut çalıştır</option>
+                <option value="http">HTTP isteği</option>
+                <option value="backlight">Arka ışık</option>
+                <option value="repair">Klavyeyi onar</option>
+              </select>
+              <button class="btn" id="addAction">+ Ekle</button>
+              <button class="btn ghost" id="clearActions">Temizle</button>
+            </div>
+          </div>
+
+          <div class="editor-foot row between">
+            <div class="row gap">
+              <button class="btn ghost danger" id="delMacro">Sil</button>
+              <button class="btn ghost" id="dupMacro">Çoğalt</button>
+            </div>
+            <div class="row gap">
+              <button class="btn" id="testMacro" title="2 saniye sonra bir kez çalışır">Dene</button>
+              <button class="btn primary" id="saveMacro">Kaydet</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIGHT -->
+  <section id="tab-light" class="tab">
+    <header class="page-head">
+      <h1>Arka ışık</h1>
+      <p>Anlık ayar ve otomatik kurallar</p>
+    </header>
+    <div class="card">
+      <div class="card-title">Şimdi</div>
+      <div class="seg" id="blSeg">
+        <button data-v="auto">Otomatik</button>
+        <button data-v="manual">Manuel</button>
+        <button data-v="off">Kapalı</button>
+      </div>
+      <div class="field mt">
+        <label>Seviye <b id="blLvlText">—</b></label>
+        <input type="range" id="blLevel" min="0" max="7" step="1">
+      </div>
+      <div class="row between">
+        <span class="muted small" id="blInfo">—</span>
+        <button class="btn ghost small" id="blRules">Kurallara dön</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Kurallar <span class="muted small">— yukarıdan aşağıya, uyan ilk kural uygulanır</span></div>
+      <table class="rules">
+        <thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Programlar</th><th>Mod</th><th>Seviye</th><th></th></tr></thead>
+        <tbody id="rulesBody"></tbody>
+      </table>
+      <button class="btn small" id="addRule">+ Kural ekle</button>
+      <div class="grid3 mt">
+        <div class="field">
+          <label>Hiçbir kural uymazsa</label>
+          <select id="blDefault" class="sel">
+            <option value="leave">Dokunma</option>
+            <option value="auto">Otomatik</option>
+            <option value="manual">Manuel</option>
+            <option value="off">Kapalı</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="blDefaultLevel">Varsayılan seviye</label>
+          <input type="number" id="blDefaultLevel" min="0" class="num">
+        </div>
+        <div class="field">
+          <label for="blLowOff">Pil şu yüzdenin altındaysa kapat</label>
+          <input type="number" id="blLowOff" min="0" max="100" class="num">
+        </div>
+      </div>
+      <details class="mt">
+        <summary>Sönme süreleri</summary>
+        <div class="grid3">
+          <div class="field"><label for="dOut">Eller uzaktayken (sn)</label><input type="number" id="dOut" min="0" step="5" class="num"></div>
+          <div class="field"><label for="dIn">Eller klavyedeyken (sn)</label><input type="number" id="dIn" min="0" step="5" class="num"></div>
+          <div class="field"><label for="dPow">Şarjdayken (sn)</label><input type="number" id="dPow" min="0" step="5" class="num"></div>
+        </div>
+        <div class="muted small">0 = klavyedeki mevcut değere dokunma.</div>
+      </details>
+      <div class="row mt"><button class="btn primary" id="saveLight">Kaydet</button></div>
+    </div>
+  </section>
+
+  <!-- ADVANCED -->
+  <section id="tab-adv" class="tab">
+    <header class="page-head">
+      <h1>Gelişmiş</h1>
+      <p>Cihaz eşleşmesi, ham ayar dosyası, tanılama</p>
+    </header>
+    <div class="card">
+      <div class="grid3">
+        <div class="field"><label for="aName">Cihaz adı içerir</label><input id="aName" class="mono"></div>
+        <div class="field"><label for="aPid">Cihaz PID (boş = otomatik)</label><input id="aPid" class="mono" placeholder="b369"></div>
+        <div class="field"><label for="aPoll">Yoklama aralığı (sn)</label><input type="number" id="aPoll" min="3" class="num"></div>
+      </div>
+      <div class="field">
+        <label>Tüm makroları durduran kısayol</label>
+        <div class="row gap"><input id="aStop" class="mono grow"><button class="btn" id="aStopCap">Yakala</button></div>
+      </div>
+      <button class="btn primary" id="saveAdv">Kaydet</button>
+    </div>
+    <div class="card">
+      <div class="card-title row between"><span>config.json</span>
+        <span class="row gap"><button class="btn small" id="rawLoad">Yenile</button><button class="btn small primary" id="rawSave">Kaydet</button></span></div>
+      <textarea id="raw" class="code" spellcheck="false"></textarea>
+    </div>
+    <div class="card">
+      <div class="card-title row between"><span>Tanılama ve günlükler</span>
+        <span class="row gap">
+          <button class="btn small" id="diagBtn">Tanılama raporu</button>
+          <button class="btn small" id="logBtn">Günlük</button>
+          <button class="btn small" id="rlogBtn">Onarım günlüğü</button>
+          <button class="btn small ghost" id="copyOut">Kopyala</button>
+        </span></div>
+      <pre id="out" class="code out">—</pre>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="dialog">
+    <div class="pulse"></div>
+    <h2 id="ovTitle">Bir tuşa bas</h2>
+    <p id="ovText" class="muted"></p>
+    <button class="btn" id="ovCancel">Vazgeç</button>
+  </div>
+</div>
+<div class="recbar" id="recbar" hidden>
+  <span class="recdot"></span> Kaydediliyor… <span id="recTime">0.0 sn</span>
+  <button class="btn small primary" id="recStop">Durdur</button>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
