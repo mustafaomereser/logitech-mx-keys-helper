@@ -1,5 +1,9 @@
 # Değişiklikler
 
+## v0.3.1
+- Elle seçilen arka ışık (arayüz, tray, makro ya da klavyenin kendi tuşları) artık hatırlanıyor: yeniden başlatınca geri gelir, bir sonraki kural değişimine kadar geçerli kalır. Önceden her başlatmada gece kuralı ışığı düşük seviyeye çekiyordu.
+- Parlaklık çubukları tıklanan seviyeye doğru tek tek yanıp sönerek ilerliyor, klavye yanıt verene kadar takılmış görünmüyor.
+
 ## v0.3.0
 - Yeni arayüz: koyu "oyun yazılımı" tasarımı, üst çubukta profil seçici, oyun modu düğmesi, pil ve bağlantı durumu.
 - Atamalar: tıklanabilir MX Keys Mini klavyesi ve fare çizimi. Tuşa tıkla, atanmışsa açılır, değilse makro oluşur. Ctrl/Alt/Shift/Win'e tıklayarak kombinasyon kurulur. F tuşlarında MX özel işlevi ya da F tuşu seçilir.

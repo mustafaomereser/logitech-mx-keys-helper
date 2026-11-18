@@ -399,6 +399,15 @@ func watchConfig() {
 type State struct {
 	LastWorkingLevel int            `json:"last_working_level"`
 	Successes        map[string]int `json:"successes"`
+	Backlight        *savedBacklight `json:"backlight,omitempty"`
+}
+
+// savedBacklight is the user's last manual backlight choice. It survives restarts
+// and is dropped when the active rule changes (RuleKey no longer matches).
+type savedBacklight struct {
+	Mode    string `json:"mode"`
+	Level   int    `json:"level"`
+	RuleKey string `json:"rule_key"`
 }
 
 var stateMu sync.Mutex

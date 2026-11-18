@@ -389,11 +389,7 @@ func handleCommand(id int) {
 	case id == idBlOff:
 		mgr.setBacklightOverride("off", 0)
 	case id == idBlRules:
-		mgr.mu.Lock()
-		mgr.blOverride = nil
-		mgr.lastApplied = ""
-		mgr.mu.Unlock()
-		go mgr.applyBacklightRules(true)
+		go mgr.clearBacklightOverride()
 	case id >= idBlLevelBase && id < idBlLevelBase+32:
 		mgr.setBacklightOverride("manual", id-idBlLevelBase)
 	case id == idLearn:

@@ -375,9 +375,10 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; c
 /* ---------- lighting ---------- */
 .light-card .kb-wrap { max-width: 720px; margin: 4px auto 18px; }
 .lvl-picker { display: flex; gap: 4px; height: 30px; align-items: flex-end; width: 260px; }
-.lvl-picker button { all: unset; cursor: pointer; flex: 1; border-radius: 4px; background: var(--surface-2); }
+.lvl-picker button { all: unset; cursor: pointer; flex: 1; border-radius: 4px; background: var(--surface-2); transition: background .18s ease, transform .18s ease; }
 .lvl-picker button:hover { background: #3a3e43; }
 .lvl-picker button.on { background: var(--text); }
+.lvl-picker button:active { transform: scaleY(.92); transform-origin: bottom; }
 .lvl-picker.dis { opacity: .4; pointer-events: none; }
 .rules { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; margin: 10px 0 8px; }
 .rules:has(.muted:only-child) { border: none; }

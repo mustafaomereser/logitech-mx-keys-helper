@@ -1112,16 +1112,45 @@ function renderLightState() {
   const pick = $("#blPicker");
   if (pick.children.length !== lv) {
     pick.innerHTML = Array.from({ length: lv }, (_, i) => `<button data-l="${i}" title="Seviye ${i}" style="height:${18 + i * 82 / (lv - 1)}%"></button>`).join("");
-    $$("button", pick).forEach(b => b.onclick = () => setBL("manual", +b.dataset.l));
+    $$("button", pick).forEach(b => b.onclick = () => pickLevel(+b.dataset.l));
   }
   pick.classList.toggle("dis", !has);
-  $$("button", pick).forEach(b => b.classList.toggle("on", has && bl.enabled && +b.dataset.l <= bl.level));
+  // while the click animation runs (and the keyboard catches up) the bars belong to it
+  if (Date.now() > blAnim.hold) animateLevel(has && bl.enabled ? bl.level : -1);
   if (!has) { $("#blInfo").textContent = st.connected ? "Bu klavye arka ışık ayarı bildirmiyor." : "Klavye bağlı değil."; $("#blLvlText").textContent = ""; return; }
   const mode = !bl.enabled ? "off" : bl.mode === 1 ? "auto" : "manual";
   seg($("#blSeg"), mode, v => setBL(v, bl.level));
-  $("#blLvlText").textContent = `${bl.level} / ${lv - 1}`;
+  if (Date.now() > blAnim.hold) $("#blLvlText").textContent = `${bl.level} / ${lv - 1}`;
   $("#blInfo").textContent = st.backlight_override ? "Elle ayarlandı — bir sonraki kural değişimine kadar geçerli." : "Kurallar uygulanıyor.";
 }
+// level bars: light up / dim one step at a time towards the target, so a click
+// visibly "travels" instead of jumping (and never looks stuck while the keyboard answers)
+const blAnim = { shown: null, target: null, timer: 0, hold: 0 };
+function paintLevel(n) {
+  $$("#blPicker button").forEach(b => b.classList.toggle("on", +b.dataset.l <= n));
+  blAnim.shown = n;
+}
+function animateLevel(target) {
+  if (blAnim.shown === null) { paintLevel(target); return; }
+  if (target === blAnim.target && blAnim.timer) return;
+  blAnim.target = target;
+  clearInterval(blAnim.timer);
+  if (blAnim.shown === target) { blAnim.timer = 0; return; }
+  blAnim.timer = setInterval(() => {
+    const s = blAnim.shown;
+    if (s === blAnim.target) { clearInterval(blAnim.timer); blAnim.timer = 0; return; }
+    paintLevel(s + (blAnim.target > s ? 1 : -1));
+  }, 45);
+}
+function pickLevel(l) {
+  const lv = (st && st.backlight.levels) || 8;
+  blAnim.hold = Date.now() + 2500;
+  animateLevel(l);
+  $("#blLvlText").textContent = `${l} / ${lv - 1}`;
+  seg($("#blSeg"), "manual");
+  setBL("manual", l);
+}
+
 async function setBL(mode, level) {
   try { st = await api("POST", "/api/backlight", { mode, level }); renderLightState(); renderHomeState(); } catch (e) { toast(e.message, true); }
 }

@@ -100,17 +100,10 @@ func startGUIServer() error {
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		if req.Mode == "rules" {
-			mgr.mu.Lock()
-			mgr.blOverride = nil
-			mgr.lastApplied = ""
-			mgr.mu.Unlock()
-			mgr.applyBacklightRules(true)
+			mgr.clearBacklightOverride()
 		} else {
-			mgr.mu.Lock()
-			mgr.blOverride = &blTarget{Mode: req.Mode, Level: req.Level}
-			mgr.lastApplied = ""
-			mgr.mu.Unlock()
-			mgr.applyBacklightRules(true)
+			mgr.storeBacklightOverride(req.Mode, req.Level)
+			mgr.applyBacklightRules(true) // synchronously, so the response carries the new state
 		}
 		apiState(w, r)
 	})
@@ -119,7 +112,7 @@ func startGUIServer() error {
 		writeJSON(w, map[string]any{"ok": true})
 	})
 	api("POST /api/repair/reset", func(w http.ResponseWriter, r *http.Request) {
-		saveState(State{})
+		saveState(State{Backlight: loadState().Backlight}) // reset repair history only
 		writeJSON(w, map[string]any{"ok": true})
 	})
 	api("POST /api/autostart", func(w http.ResponseWriter, r *http.Request) {

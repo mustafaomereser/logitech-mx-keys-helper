@@ -346,12 +346,13 @@ func (m *manager) onEvent(msg hidppMsg) {
 			trayRefresh()
 		}
 	case idx(featBacklight2):
-		// user changed backlight with keys: refresh cached state
+		// user changed backlight with keys: refresh cached state and remember the choice
 		go func() {
 			if b, err := hp.getBacklight(); err == nil {
 				m.mu.Lock()
 				m.bl, m.blKnown = b, true
 				m.mu.Unlock()
+				m.noteKeyboardBacklight(b)
 				trayRefresh()
 			}
 		}()
@@ -399,7 +400,14 @@ func (m *manager) applyBacklightRules(force bool) {
 	}
 	if key != m.lastRuleKey {
 		if m.lastRuleKey != "" {
-			m.blOverride = nil
+			// the active rule changed: a manual choice made under the old rule ends here
+			if m.blOverride != nil {
+				m.blOverride = nil
+				go persistBacklight(nil, "")
+			}
+		} else if s := loadState().Backlight; s != nil && s.RuleKey == key && m.blOverride == nil {
+			// first apply after start: bring back the manual choice made before the restart
+			m.blOverride = &blTarget{Mode: s.Mode, Level: s.Level}
 		}
 		m.lastRuleKey = key
 		force = true
@@ -411,7 +419,7 @@ func (m *manager) applyBacklightRules(force bool) {
 	if t == nil {
 		return
 	}
-	sig := fmt.Sprintf("%s/%d", t.Mode, t.Level)
+	sig := blSig(t.Mode, t.Level)
 	m.mu.Lock()
 	same := sig == m.lastApplied
 	m.mu.Unlock()
@@ -436,11 +444,75 @@ func (m *manager) applyBacklightRules(force bool) {
 }
 
 func (m *manager) setBacklightOverride(mode string, level int) {
+	m.storeBacklightOverride(mode, level)
+	go m.applyBacklightRules(true)
+}
+
+// storeBacklightOverride records (and persists) a manual choice without applying it.
+func (m *manager) storeBacklightOverride(mode string, level int) {
 	m.mu.Lock()
 	m.blOverride = &blTarget{Mode: mode, Level: level}
 	m.lastApplied = ""
+	key := m.lastRuleKey
 	m.mu.Unlock()
-	go m.applyBacklightRules(true)
+	if key == "" {
+		key, _ = m.activeBacklightTarget()
+	}
+	persistBacklight(&blTarget{Mode: mode, Level: level}, key)
+}
+
+// clearBacklightOverride hands the backlight back to the rules ("Kurallara dön").
+func (m *manager) clearBacklightOverride() {
+	m.mu.Lock()
+	m.blOverride = nil
+	m.lastApplied = ""
+	m.mu.Unlock()
+	persistBacklight(nil, "")
+	m.applyBacklightRules(true)
+}
+
+func persistBacklight(t *blTarget, ruleKey string) {
+	st := loadState()
+	if t == nil {
+		if st.Backlight == nil {
+			return
+		}
+		st.Backlight = nil
+	} else {
+		st.Backlight = &savedBacklight{Mode: t.Mode, Level: t.Level, RuleKey: ruleKey}
+	}
+	saveState(st)
+}
+
+func blSig(mode string, level int) string {
+	if mode != "manual" {
+		level = 0 // auto/off: the level is not ours to keep
+	}
+	return fmt.Sprintf("%s/%d", mode, level)
+}
+
+// noteKeyboardBacklight records a change made with the keyboard's own backlight
+// keys as a manual choice, so a restart or the next poll does not undo it.
+func (m *manager) noteKeyboardBacklight(b backlight) {
+	if b.Enabled == 0 {
+		return // idle dimming may report "off"; never remember that as a choice
+	}
+	mode := "manual"
+	if b.Mode() == 1 {
+		mode = "auto"
+	}
+	sig := blSig(mode, int(b.Level))
+	m.mu.Lock()
+	if m.lastApplied == "" || sig == m.lastApplied || m.lastRuleKey == "lowbatt" {
+		m.mu.Unlock()
+		return
+	}
+	m.blOverride = &blTarget{Mode: mode, Level: int(b.Level)}
+	m.lastApplied = sig
+	key := m.lastRuleKey
+	m.mu.Unlock()
+	logf("Işık klavyeden değiştirildi: %s (seviye %d), hatırlanıyor", mode, b.Level)
+	persistBacklight(&blTarget{Mode: mode, Level: int(b.Level)}, key)
 }
 
 func (m *manager) stepBacklight(delta int) {
