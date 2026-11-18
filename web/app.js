@@ -216,11 +216,13 @@ function decorateFKeys(el) {
 
 // ---------- nav ----------
 // switching tabs keeps an unsaved draft; it is still there when you come back
-function go(tab) {
+function go(tab, noHash) {
   $$("#nav button").forEach(x => x.classList.toggle("active", x.dataset.tab === tab));
   $$(".tab").forEach(t => t.classList.toggle("active", t.id === "tab-" + tab));
   store.set("tab", tab);
   if (tab === "adv") loadRaw();
+  if (tab === "macros" && !noHash) setView(view);
+  else if (!noHash) setHash();
 }
 $$("#nav button").forEach(b => b.onclick = () => go(b.dataset.tab));
 $$("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
@@ -363,8 +365,7 @@ function setProfile(p) {
   profile = p;
   store.set("profile", p);
   $("#profileName").textContent = p ? profLabel(p) + " profili" : "Varsayılan profil";
-  if (draft && !inProfile(draft, p) && !dirty) { draft = null; selId = null; renderEditor(); }
-  renderMacroList(); updateAssignKB();
+  renderMacroList(); updateAssignKB(); renderKeyPanel();
 }
 
 function renderProfileMenu() {
@@ -406,7 +407,54 @@ function renderProfileMenu() {
 }
 $("#profileBtn").onclick = e => { e.stopPropagation(); const m = $("#profileMenu"); if (m.hidden) renderProfileMenu(); m.hidden = !m.hidden; };
 
-// ---------- assignment keyboard ----------
+// ---------- assignment views ----------
+// keys   = keyboard map + panel for the selected key (assign / edit / unassign)
+// list   = macro library grouped by profile
+// editor = full-page macro editor ("Geri" returns to keys or list)
+let view = "keys";
+let backView = "keys";
+let selKey = "";
+
+function setView(v, opts = {}) {
+  view = v;
+  $("#viewKeys").hidden = v !== "keys";
+  $("#viewList").hidden = v !== "list";
+  $("#viewEditor").hidden = v !== "editor";
+  $("#assignHead").hidden = v === "editor";
+  $("#profileWrap").hidden = v !== "keys";
+  seg($("#assignView"), v === "editor" ? backView : v);
+  $("#assignLead").textContent = v === "list" ? "Bütün makroların. Satıra tıkla, düzenle." : "Bir tuşa tıkla, ne yapacağını seç.";
+  if (v === "keys") { updateAssignKB(); renderKeyPanel(); }
+  if (v === "list") renderMacroList();
+  if (!opts.noHash) setHash();
+  $("main").scrollTop = 0;
+}
+$$("#assignView button").forEach(b => b.onclick = async () => {
+  if (view === "editor" && !(await leaveDraft())) return;
+  pickMode = false;
+  setView(b.dataset.v);
+});
+
+function currentTab() { const a = $("#nav button.active"); return a ? a.dataset.tab : "home"; }
+function setHash() {
+  const t = currentTab();
+  let h = "#/" + t;
+  if (t === "macros") h += view === "list" ? "/list" : view === "editor" && draft ? "/edit/" + draft.id : "";
+  if (location.hash !== h) window.history.replaceState(null, "", h); // "history" alone is the undo stack
+}
+function route() {
+  const p = location.hash.replace(/^#\/?/, "").split("/");
+  const tab = ["home", "macros", "light", "game", "adv"].includes(p[0]) ? p[0] : store.get("tab", "home");
+  go(tab, true);
+  if (tab !== "macros") return;
+  if (p[1] === "list") setView("list", { noHash: true });
+  else if (p[1] === "edit" && cfg.macros.some(m => m.id === p[2])) openEditor(p[2], { noHash: true });
+  else {
+    if (p[1] === "key" && p[2]) selKey = normTrig(decodeURIComponent(p[2])); // #/macros/key/ctrl+alt+i
+    setView("keys", { noHash: true });
+  }
+}
+
 function boundMap() {
   // trigger -> "own" | "inh" for the current profile
   const map = {};
@@ -421,7 +469,6 @@ function boundMap() {
 }
 
 function keyTrigger(k) {
-  // trigger name for a key with current modifier toggles
   const name = keyName(k);
   return name ? normTrig([...mods, name].join("+")) : "";
 }
@@ -431,8 +478,7 @@ function updateAssignKB() {
   const el = $("#kbAssign");
   decorateFKeys(el);
   const bound = boundMap();
-  const selTrig = draft ? normTrig(draft.trigger) : "";
-  // keys whose main part (with the current modifiers) is bound
+  const selTrig = pickMode && draft ? normTrig(draft.trigger) : selKey;
   const modsKey = MODS.filter(m => mods.has(m));
   const selMain = selTrig && !selTrig.startsWith("mx:") ? trigMain(selTrig) : "";
   const selMods = selTrig ? trigMods(selTrig) : [];
@@ -449,11 +495,7 @@ function updateAssignKB() {
       if (t) { state = bound[t] || ""; sel = name === selMain; }
       const c = k.fkey && fkeyControl(k.fkey);
       if (c && !modsKey.length) { state = state || bound[c.cid] || ""; sel = sel || c.cid === selTrig; }
-      // a combo bound to this key with other modifiers: show it faintly
-      if (!state && name) {
-        const any = Object.keys(bound).some(x => !x.startsWith("mx:") && trigMain(x) === name);
-        if (any) state = "inh";
-      }
+      if (!state && name && Object.keys(bound).some(x => !x.startsWith("mx:") && trigMain(x) === name)) state = "inh";
     }
     b.classList.toggle("own", state === "own");
     b.classList.toggle("inh", state === "inh");
@@ -465,19 +507,18 @@ function updateAssignKB() {
     b.classList.toggle("inh", bound[t] === "inh");
     b.classList.toggle("sel", t === selTrig);
   });
-  // MX keys without an F-key position
   const extra = controls.filter(c => c.divertable && !(c.pos >= 1 && c.pos <= 12));
   $("#mxExtra").hidden = !extra.length;
-  $("#mxExtra").innerHTML = extra.length ? "<span>Diğer MX tuşları:</span>" + extra.map(c => `<button data-cid="${c.cid}" class="${bound[c.cid] === "own" ? "own" : ""}">${esc(ctlName(c.cid) || c.cid.slice(3))}</button>`).join("") : "";
-  $$("#mxExtra button").forEach(b => b.onclick = () => useTrigger(b.dataset.cid));
-  $("#kbAssign").classList.toggle("picking", pickMode);
+  $("#mxExtra").innerHTML = extra.length ? "<span>Diğer MX tuşları:</span>" + extra.map(c => `<button data-cid="${c.cid}" class="${bound[c.cid] === "own" ? "own" : ""} ${c.cid === selTrig ? "sel" : ""}">${esc(ctlName(c.cid) || c.cid.slice(3))}</button>`).join("") : "";
+  $$("#mxExtra button").forEach(b => b.onclick = () => handleKeyTrigger(b.dataset.cid));
+  el.classList.toggle("picking", pickMode);
   const hint = $("#kbHint");
   hint.classList.toggle("picking", pickMode || mods.size > 0);
-  hint.innerHTML = pickMode ? "Tetikleyici seç: klavyede ya da farede bir tuşa tıkla. <a href='#' id='pickCancel'>Vazgeç</a>"
-    : mods.size ? `Kombinasyon: <b>${[...MODS.filter(m => mods.has(m))].map(keyLabel).join(" + ")} + …</b> şimdi ana tuşa tıkla.`
-      : "Bir tuşa tıkla: atanmışsa açılır, değilse yeni makro oluşur. Kombinasyon için önce <b>Ctrl / Alt / Shift / Win</b>’e tıkla.";
+  hint.innerHTML = pickMode ? `“${esc(draft ? draft.name : "")}” için tetikleyici seç: bir tuşa tıkla. <a href="#" id="pickCancel">Vazgeç</a>`
+    : mods.size ? `<b>${MODS.filter(m => mods.has(m)).map(keyLabel).join(" + ")} + …</b> şimdi ana tuşa tıkla.`
+      : "Kombinasyon için önce <b>Ctrl</b>, <b>Alt</b>, <b>Shift</b> ya da <b>Win</b>’e tıkla.";
   const pc = $("#pickCancel");
-  if (pc) pc.onclick = e => { e.preventDefault(); pickMode = false; updateAssignKB(); };
+  if (pc) pc.onclick = e => { e.preventDefault(); pickMode = false; setView("editor"); };
 }
 
 let keyMenuEl = null;
@@ -504,104 +545,265 @@ async function onKeyClick(k, btn, e) {
     updateAssignKB();
     return;
   }
-  let name = keyName(k);
-  if (k.oem && !name) {
+  if (k.oem && !keyName(k)) {
     const t = await capture(`Klavyende “${k.label}” tuşuna bas`, "Bu tuşun kodu klavye düzenine göre değişiyor; bir kez basman yeterli, sonra hatırlanır.");
     const main = trigMain(t);
     if (!main || main.startsWith("mx:") || ["mouse4", "mouse5", "middle"].includes(main)) return;
     oemMap[k.id] = main; store.set("oem", oemMap);
-    name = main;
   }
   const c = k.fkey && fkeyControl(k.fkey);
   if (c && !mods.size) {
     keyMenu(e, [
-      { html: `<b>MX işlevi</b> — ${esc(ctlName(c.cid) || c.cid)}`, fn: () => useTrigger(c.cid) },
-      { html: `<b>F${k.fkey}</b> tuşu (Fn ile)`, fn: () => useTrigger(normTrig("f" + k.fkey)) },
+      { html: `<b>MX işlevi</b> — ${esc(ctlName(c.cid) || c.cid)}`, fn: () => handleKeyTrigger(c.cid) },
+      { html: `<b>F${k.fkey}</b> tuşu (Fn ile)`, fn: () => handleKeyTrigger("f" + k.fkey) },
     ]);
     return;
   }
   const t = keyTrigger(k);
   mods.clear();
-  useTrigger(t);
-  updateAssignKB();
+  handleKeyTrigger(t);
 }
-$$(".mbtn").forEach(b => b.onclick = () => useTrigger(b.dataset.trig));
+$$(".mbtn").forEach(b => b.onclick = () => handleKeyTrigger(b.dataset.trig));
 
-async function useTrigger(t) {
+function handleKeyTrigger(t) {
   t = normTrig(t);
   if (!t) return;
   if (pickMode && draft) {
     snapshot();
-    draft.trigger = t; pickMode = false; markDirty(); renderEditor();
+    draft.trigger = t; pickMode = false; markDirty();
+    setView("editor"); renderEditor();
     return;
   }
-  // existing macro in this profile (or inherited default)?
-  const own = cfg.macros.find(m => inProfile(m, profile) && normTrig(m.trigger) === t);
-  const inh = !own && profile && cfg.macros.find(m => !m.app && normTrig(m.trigger) === t);
-  if (own) return selectMacro(own.id);
-  if (inh) {
-    const v = await modal({
-      title: "Varsayılan profilde atanmış",
-      body: `<p class="muted">Bu tuş varsayılan profilde “${esc(inh.name)}” makrosuna bağlı. ${esc(profLabel(profile))} içinde farklı bir şey yapmasını istiyorsan buraya yeni makro ekle.</p>`,
-      buttons: [{ label: "Varsayılandakini aç", value: "open" }, { label: "Bu profilde yeni makro", value: "new", primary: true }],
-    });
-    if (v === "open") return selectMacro(inh.id);
-    if (v !== "new") return;
+  selKey = t;
+  updateAssignKB(); renderKeyPanel();
+}
+
+// ---------- key panel ----------
+const trigText = t => {
+  t = normTrig(t);
+  if (!t) return "";
+  if (t.startsWith("mx:")) return ctlName(t) || "MX tuşu";
+  return { mouse4: "Fare geri", mouse5: "Fare ileri", middle: "Fare orta" }[t] || t.split("+").map(keyLabel).join("+");
+};
+const short = (s, n = 32) => (s = String(s || "")).length > n ? s.slice(0, n - 1) + "…" : s;
+const BTN_TR = { left: "Sol", right: "Sağ", middle: "Orta", mouse4: "Yan 4", mouse5: "Yan 5" };
+function actionText(a) {
+  switch (a.type) {
+    case "keys": return `Bas: ${trigText(a.keys) || "—"}`;
+    case "keydown": return `Basılı tut: ${trigText(a.keys) || "—"}`;
+    case "keyup": return `Bırak: ${trigText(a.keys) || "—"}`;
+    case "text": return `Yaz: “${short(a.text, 28)}”`;
+    case "click": return `${BTN_TR[a.button || "left"]} ${a.count > 1 ? "çift tık" : "tık"}`;
+    case "mousedown": return `${BTN_TR[a.button || "left"]} tuşu bas`;
+    case "mouseup": return `${BTN_TR[a.button || "left"]} tuşu bırak`;
+    case "move": return a.rel ? `Fare ${a.x}, ${a.y} kadar` : `Fare → ${a.x}, ${a.y}`;
+    case "scroll": return `Tekerlek ${a.amount > 0 ? "+" : ""}${a.amount}`;
+    case "delay": return a.ms_max ? `Bekle ${a.ms}–${a.ms_max} ms` : `Bekle ${a.ms} ms`;
+    case "run": return `Aç: ${short((a.cmd || "").split(/[\\/]/).pop(), 28)}`;
+    case "url": return `Aç: ${short((a.url || "").replace(/^https?:\/\//, ""), 28)}`;
+    case "shell": return `Komut: ${short(a.cmd, 26)}`;
+    case "http": return `HTTP ${a.method || "GET"}`;
+    case "backlight": return `Arka ışık: ${a.value || "toggle"}`;
+    case "gamemode": return "Oyun modu";
+    case "repair": return "Klavyeyi onar";
   }
-  if (!(await leaveDraft())) return;
-  newMacro("blank", t);
+  return a.type;
+}
+function macroSummary(m) {
+  const acts = m.actions || [];
+  if (!acts.length) return "Eylem yok";
+  const moves = acts.filter(a => a.type === "move").length;
+  const main = acts.filter(a => a.type !== "delay" && a.type !== "move");
+  let s = main.slice(0, 2).map(actionText).join(" · ");
+  if (moves) s += (s ? " · " : "") + `fare yolu`;
+  const rest = main.length - 2;
+  return s + (rest > 0 ? ` · +${rest}` : "");
+}
+const modeName = { press: "Bir kez", hold: "Basılı tuttukça", toggle: "Aç / kapa" };
+
+function macroCardHTML(m, inh) {
+  return `<div class="kp-macro ${m.enabled ? "" : "off"}">
+    <div class="kp-mhead">
+      <div><b>${esc(m.name || "Adsız")}</b><span class="kp-mode">${modeName[m.mode] || m.mode}${inh ? " · varsayılan profilden" : ""}</span></div>
+      <label class="switch" title="Etkin"><input type="checkbox" data-kpen="${esc(m.id)}" ${m.enabled ? "checked" : ""}><span></span></label>
+    </div>
+    <ol class="kp-acts">${(m.actions || []).filter(a => a.type !== "delay").slice(0, 4).map(a => `<li>${esc(actionText(a))}</li>`).join("") || "<li>Eylem yok</li>"}</ol>
+    ${(m.actions || []).filter(a => a.type !== "delay").length > 4 ? `<div class="kp-more">+${(m.actions || []).filter(a => a.type !== "delay").length - 4} eylem daha</div>` : ""}
+    <div class="kp-btns">
+      <button class="btn primary sm" data-kpedit="${esc(m.id)}">Düzenle</button>
+      <button class="btn sm" data-kptest="${esc(m.id)}"><svg class="ic sm"><use href="#i-play"/></svg>Dene</button>
+      ${inh ? "" : `<button class="btn ghost sm danger" data-kpun="${esc(m.id)}">Atamayı kaldır</button>`}
+    </div>
+  </div>`;
 }
 
-// ---------- macro list ----------
-const modeName = { press: "bir kez", hold: "basılı tut", toggle: "aç/kapa" };
+const QUICK = [
+  ["shortcut", "i-kb", "Kısayol gönder", "Başka bir tuş ya da kombinasyon olsun"],
+  ["text", "i-text", "Metin yaz", "İmza, e-posta, hazır cevap"],
+  ["run", "i-app", "Program ya da site aç", "Uygulama, klasör veya adres"],
+  ["media", "i-play", "Medya tuşu", "Oynat, sonraki, ses"],
+  ["turbo", "i-mouse", "Turbo tık", "Basılı tuttukça hızlı sol tık"],
+  ["record", "i-rec", "Kaydederek oluştur", "Yaptıklarını kaydet, tekrar oynat"],
+  ["blank", "i-plus", "Gelişmiş makro", "Eylemleri tek tek kur"],
+];
 
-function macroItem(m, running, inh) {
-  const conflict = m.enabled && cfg.macros.some(o => o.id !== m.id && o.enabled && ieq(o.app, m.app) && normTrig(o.trigger) && normTrig(o.trigger) === normTrig(m.trigger));
-  return `
-    <div class="mitem ${m.id === selId ? "sel" : ""} ${m.enabled ? "" : "off"} ${inh ? "inh" : ""}" data-id="${esc(m.id)}">
-      <div class="n">${esc(m.name || "Adsız")}</div>
-      <label class="switch" title="Etkin"><input type="checkbox" data-en="${esc(m.id)}" ${m.enabled ? "checked" : ""}><span></span></label>
-      <div class="t">${triggerHTML(m.trigger)}
-        <span class="chip mode-${m.mode}">${modeName[m.mode] || m.mode}</span>
-        ${running.has(m.id) ? '<span class="chip run">çalışıyor</span>' : ""}
-        ${m === draft && dirty ? `<span class="chip">${cfg.macros.some(x => x.id === m.id) ? "değişti" : "yeni"}</span>` : ""}
-        ${conflict ? '<span class="chip warn">çakışma</span>' : ""}
-      </div>
-    </div>`;
+function renderKeyPanel() {
+  const p = $("#keyPanel");
+  if (!cfg) return;
+  if (pickMode) {
+    p.innerHTML = `<div class="kp-empty">${icon("i-kb", "xl")}<b>Tetikleyici seçiliyor</b><p>“${esc(draft ? draft.name : "")}” makrosunu başlatacak tuşa tıkla.</p><button class="btn sm" id="kpPickCancel">Vazgeç</button></div>`;
+    $("#kpPickCancel").onclick = () => { pickMode = false; setView("editor"); };
+    return;
+  }
+  if (!selKey) {
+    const own = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger));
+    p.innerHTML = `<div class="kp-empty">${icon("i-kb", "xl")}<b>Bir tuşa tıkla</b><p>Atanmışsa ne yaptığını görürsün, boşsa birkaç tıkla bir şey atarsın.</p></div>
+      ${own.length ? `<div class="kp-label">Bu profilde atanmış</div><div class="kp-list">${own.map(m => `<button data-kpsel="${esc(normTrig(m.trigger))}"><span class="kp-k">${esc(trigText(m.trigger))}</span><span>${esc(m.name)}</span></button>`).join("")}</div>` : ""}`;
+    $$("[data-kpsel]", p).forEach(b => b.onclick = () => handleKeyTrigger(b.dataset.kpsel));
+    return;
+  }
+  const own = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger) === selKey);
+  const inh = profile ? cfg.macros.filter(m => !m.app && normTrig(m.trigger) === selKey) : [];
+  let html = `<div class="kp-head"><div class="kp-trig">${triggerHTML(selKey)}</div><button class="icon-btn" id="kpClose" title="Kapat">${icon("i-x", "sm")}</button></div>
+    <div class="kp-sub">${profile ? esc(profLabel(profile)) + " profili" : "Varsayılan profil · bütün programlar"}</div>`;
+  if (own.length) {
+    html += own.map(m => macroCardHTML(m)).join("");
+    if (own.filter(m => m.enabled).length > 1) html += `<div class="conflict">Bu tuşa birden çok etkin makro bağlı; yalnızca biri çalışır.</div>`;
+  } else {
+    if (inh.length) html += macroCardHTML(inh[0], true) + `<div class="kp-label">Bu profilde başka bir şey yapsın</div>`;
+    else html += `<div class="kp-label">Bu tuş boş. Ne yapsın?</div>`;
+    html += `<div class="kp-quick">${QUICK.map(([k, ic, t, d]) => `<button data-q="${k}">${icon(ic, "sm")}<span><b>${t}</b><small>${d}</small></span></button>`).join("")}</div>`;
+    const bindable = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger) !== selKey);
+    if (bindable.length) html += `<button class="btn ghost sm kp-bind" id="kpBind">${icon("i-link", "sm")}Var olan bir makroyu bu tuşa bağla</button>`;
+  }
+  p.innerHTML = html;
+  $("#kpClose").onclick = () => { selKey = ""; updateAssignKB(); renderKeyPanel(); };
+  $$("[data-kpedit]", p).forEach(b => b.onclick = () => openEditor(b.dataset.kpedit));
+  $$("[data-kptest]", p).forEach(b => b.onclick = async () => { await api("POST", "/api/macro/test", cfg.macros.find(m => m.id === b.dataset.kptest)); toast("2 sn sonra bir kez çalışacak — hedef pencereye geç"); });
+  $$("[data-kpun]", p).forEach(b => b.onclick = async () => {
+    const m = cfg.macros.find(x => x.id === b.dataset.kpun);
+    m.trigger = ""; m.enabled = false;
+    if (await saveCfg("Atama kaldırıldı; makro Makrolar listesinde duruyor")) { updateAssignKB(); renderKeyPanel(); }
+  });
+  $$("[data-kpen]", p).forEach(el => el.onchange = async () => {
+    const m = cfg.macros.find(x => x.id === el.dataset.kpen);
+    m.enabled = el.checked;
+    await saveCfg(el.checked ? "Etkin" : "Devre dışı");
+    updateAssignKB(); renderKeyPanel();
+  });
+  $$("[data-q]", p).forEach(b => b.onclick = () => quickAssign(b.dataset.q));
+  const bind = $("#kpBind");
+  if (bind) bind.onclick = bindExisting;
 }
 
+async function addAssigned(m, msg) {
+  m = { id: uid(), enabled: true, app: profile, passthrough: false, repeat: 1, mode: "press", trigger: selKey, ...m };
+  cfg.macros.push(m);
+  if (!(await saveCfg(msg || "Atandı"))) { cfg.macros = cfg.macros.filter(x => x.id !== m.id); return; }
+  updateAssignKB(); renderKeyPanel(); renderMacroList();
+}
+
+const MEDIA = [["playpause", "Oynat / duraklat"], ["next", "Sonraki parça"], ["prev", "Önceki parça"], ["mute", "Sesi kapat / aç"], ["volup", "Sesi aç"], ["voldown", "Sesi kıs"], ["calc", "Hesap makinesi"], ["browserback", "Tarayıcı: geri"], ["browserfwd", "Tarayıcı: ileri"]];
+
+async function quickAssign(kind) {
+  const t = selKey;
+  if (kind === "record" || kind === "blank") {
+    if (!(await leaveDraft())) return;
+    newMacro(kind, t);
+    return;
+  }
+  if (kind === "shortcut") {
+    const k = await capture("Gönderilecek kısayola bas", `${esc(trigText(t))} tuşuna basınca bu kısayol gönderilecek. Örneğin <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Esc</kbd>.`);
+    if (!k || k.startsWith("mx:") || ["mouse4", "mouse5", "middle"].includes(k)) return;
+    return addAssigned({ name: `${trigText(t)} → ${trigText(k)}`, actions: [{ type: "keys", keys: k }] });
+  }
+  if (kind === "text") {
+    const v = await modal({ title: "Metin yaz", body: `<div class="field"><label>${esc(trigText(t))} tuşuna basınca yazılacak metin</label><textarea id="qv" rows="5"></textarea></div>`, collect: b => $("#qv", b).value });
+    if (!v) return;
+    return addAssigned({ name: "Metin: " + short(v.split("\n")[0], 24), actions: [{ type: "text", text: v }] });
+  }
+  if (kind === "run") {
+    const v = await modal({ title: "Program ya da site aç", body: `<div class="field"><label>Program yolu, klasör ya da web adresi</label><input id="qv" class="mono" placeholder="notepad.exe · C:\\Oyunlar\\oyun.exe · https://…"></div>`, collect: b => $("#qv", b).value.trim() });
+    if (!v) return;
+    const url = /^https?:\/\//i.test(v);
+    return addAssigned({ name: "Aç: " + short(url ? v.replace(/^https?:\/\//i, "") : v.split(/[\\/]/).pop(), 24), actions: [url ? { type: "url", url: v } : { type: "run", cmd: v }] });
+  }
+  if (kind === "media") {
+    const v = await modal({ title: "Medya tuşu", body: `<div class="field"><label>${esc(trigText(t))} tuşu ne yapsın?</label><select id="qv">${MEDIA.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></div>`, collect: b => $("#qv", b).value });
+    if (!v) return;
+    return addAssigned({ name: MEDIA.find(x => x[0] === v)[1], actions: [{ type: "keys", keys: v }] });
+  }
+  if (kind === "turbo") return addAssigned({ name: "Turbo tık", mode: "hold", interval_ms: 30, actions: [{ type: "click", button: "left", hold_ms: 8 }] }, "Turbo tık atandı: basılı tuttukça tıklar");
+}
+
+async function bindExisting() {
+  const list = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger) !== selKey);
+  const v = await modal({
+    title: `${trigText(selKey)} tuşuna bağla`,
+    body: `<p class="muted small">Seçtiğin makronun tetikleyicisi bu tuş olur.</p><div class="plist">${list.map(m => `<button data-v="${esc(m.id)}"><b>${esc(m.name)}</b> <span class="muted">${m.trigger ? "· şu an " + esc(trigText(m.trigger)) : "· atanmamış"}</span></button>`).join("")}</div>`,
+    init: (b, done) => $$(".plist button", b).forEach(x => { x.onclick = () => { $$(".plist button", b).forEach(y => y.classList.remove("on")); x.classList.add("on"); }; x.ondblclick = () => done(x.dataset.v); }),
+    collect: b => { const s = $(".plist .on", b); return s ? s.dataset.v : null; },
+  });
+  if (!v) return;
+  const m = cfg.macros.find(x => x.id === v);
+  m.trigger = selKey; m.enabled = true;
+  if (await saveCfg(`“${m.name}” bu tuşa bağlandı`)) { updateAssignKB(); renderKeyPanel(); }
+}
+
+// ---------- macro library ----------
 function renderMacroList() {
   if (!cfg) return;
+  $("#macroCount").textContent = cfg.macros.length || "";
   const list = $("#macroList");
   const running = new Set(st ? st.running : []);
   const q = $("#mSearch").value.trim().toLowerCase();
-  const match = m => !q || (m.name || "").toLowerCase().includes(q) || normTrig(m.trigger).includes(q) || (m.actions || []).some(a => JSON.stringify(a).toLowerCase().includes(q));
-  const own = cfg.macros.filter(m => inProfile(m, profile) && match(m)).map(m => (draft && draft.id === m.id ? draft : m));
-  const isNew = draft && !cfg.macros.some(m => m.id === draft.id);
-  if (isNew && inProfile(draft, profile)) own.unshift(draft);
-  let html = "";
-  if (profile) html += `<div class="mgroup">${esc(profLabel(profile).toUpperCase())}</div>`;
-  html += own.map(m => macroItem(m, running)).join("") || `<div class="mlist-empty">${q ? "Eşleşen makro yok." : profile ? "Bu profilde makro yok.<br>Klavyede bir tuşa tıkla." : "Henüz makro yok.<br>Klavyede bir tuşa tıkla ya da + ile başla."}</div>`;
-  if (profile) {
-    const ownTrig = new Set(cfg.macros.filter(m => inProfile(m, profile) && m.enabled).map(m => normTrig(m.trigger)));
-    const inh = cfg.macros.filter(m => !m.app && match(m) && !ownTrig.has(normTrig(m.trigger)));
-    if (inh.length) html += `<div class="mgroup">VARSAYILANDAN GELENLER</div>` + inh.map(m => macroItem(m, running, true)).join("");
+  const match = m => !q || (m.name || "").toLowerCase().includes(q) || trigText(m.trigger).toLowerCase().includes(q) || (m.app || "").toLowerCase().includes(q) || (m.actions || []).some(a => actionText(a).toLowerCase().includes(q));
+  const groups = profiles().map(p => ({ p, ms: cfg.macros.filter(m => inProfile(m, p) && match(m)) })).filter(g => g.ms.length);
+  if (!groups.length) {
+    list.innerHTML = `<div class="kp-empty">${icon("i-assign", "xl")}<b>${q ? "Eşleşen makro yok" : "Henüz makro yok"}</b><p>${q ? "Başka bir şey ara." : "Klavye görünümünde bir tuşa tıkla ya da “Yeni makro” ile başla."}</p></div>`;
+    return;
   }
-  list.innerHTML = html;
-  $$(".mitem", list).forEach(el => el.onclick = e => { if (!e.target.closest(".switch")) selectMacro(el.dataset.id); });
+  const conflictOf = m => m.enabled && normTrig(m.trigger) && cfg.macros.some(o => o.id !== m.id && o.enabled && ieq(o.app, m.app) && normTrig(o.trigger) === normTrig(m.trigger));
+  list.innerHTML = `<div class="mrow mhead"><span></span><span>Makro</span><span>Tetikleyici</span><span>Çalışma</span><span></span></div>` + groups.map(g => `
+    <div class="mgroup">${esc(g.p ? profLabel(g.p) : "Varsayılan")}<span>${g.p ? esc(g.p) : "bütün programlar"}</span></div>
+    ${g.ms.map(m => `
+      <div class="mrow ${m.enabled ? "" : "off"}" data-id="${esc(m.id)}">
+        <label class="switch" title="Etkin"><input type="checkbox" data-en="${esc(m.id)}" ${m.enabled ? "checked" : ""}><span></span></label>
+        <div class="mr-name"><b>${esc(m.name || "Adsız")}</b><span>${esc(macroSummary(m))}</span></div>
+        <div class="mr-trig">${normTrig(m.trigger) ? triggerHTML(m.trigger) : '<span class="faint">atanmamış</span>'}${conflictOf(m) ? '<span class="chip warn">çakışma</span>' : ""}</div>
+        <div class="mr-mode"><span class="chip mode-${m.mode}">${modeName[m.mode] || m.mode}</span>${running.has(m.id) ? '<span class="chip run">çalışıyor</span>' : ""}</div>
+        <div class="mr-tools">
+          <button class="icon-btn" data-test="${esc(m.id)}" title="Dene">${icon("i-play", "sm")}</button>
+          <button class="icon-btn" data-dup="${esc(m.id)}" title="Çoğalt">${icon("i-copy", "sm")}</button>
+          <button class="icon-btn danger" data-del="${esc(m.id)}" title="Sil">${icon("i-trash", "sm")}</button>
+        </div>
+      </div>`).join("")}`).join("");
+  $$(".mrow[data-id]", list).forEach(el => el.onclick = e => { if (!e.target.closest(".switch, .mr-tools")) openEditor(el.dataset.id); });
   $$("input[data-en]", list).forEach(el => el.onchange = async () => {
     const m = cfg.macros.find(x => x.id === el.dataset.en);
-    if (el.checked && !normTrig(m.trigger)) { el.checked = false; toast("Önce bir tetikleyici seç", true); return; }
+    if (el.checked && !normTrig(m.trigger)) { el.checked = false; toast("Önce bir tetikleyici seç: makroyu aç ya da klavyeden bir tuşa bağla", true); return; }
     m.enabled = el.checked;
-    if (draft && draft.id === m.id) { draft.enabled = el.checked; $("#mEnabled").checked = el.checked; }
     await saveCfg(el.checked ? "Etkinleştirildi" : "Devre dışı");
-    renderMacroList(); updateAssignKB();
+    renderMacroList();
+  });
+  $$("[data-test]", list).forEach(b => b.onclick = async () => { await api("POST", "/api/macro/test", cfg.macros.find(m => m.id === b.dataset.test)); toast("2 sn sonra bir kez çalışacak — hedef pencereye geç"); });
+  $$("[data-dup]", list).forEach(b => b.onclick = async () => {
+    const m = cfg.macros.find(x => x.id === b.dataset.dup);
+    const c = { ...clone(m), id: uid(), name: m.name + " (kopya)", enabled: false, trigger: "" };
+    cfg.macros.splice(cfg.macros.indexOf(m) + 1, 0, c);
+    if (await saveCfg("Kopyalandı (atanmamış ve kapalı)")) renderMacroList();
+  });
+  $$("[data-del]", list).forEach(b => b.onclick = async () => {
+    const m = cfg.macros.find(x => x.id === b.dataset.del);
+    if (!(await ask("Makroyu sil", `“${esc(m.name)}” silinsin mi?`, "Sil", true))) return;
+    cfg.macros = cfg.macros.filter(x => x.id !== m.id);
+    if (await saveCfg("Silindi")) renderMacroList();
   });
 }
 $("#mSearch").oninput = renderMacroList;
 
 async function leaveDraft() {
-  if (!dirty) return true;
+  if (!dirty || !draft) return true;
   const v = await modal({
     title: "Kaydedilmemiş değişiklik",
     body: `<p class="muted">“${esc(draft.name || "Adsız")}” makrosunda kaydedilmemiş değişiklikler var.</p>`,
@@ -610,19 +812,30 @@ async function leaveDraft() {
   if (!v) return false;
   if (v === "save") return saveMacro();
   dirty = false;
-  if (!cfg.macros.some(m => m.id === draft.id)) { draft = null; selId = null; renderEditor(); renderMacroList(); }
   return true;
 }
 
-async function selectMacro(id) {
-  if (id === selId && draft) return;
-  if (!(await leaveDraft())) return;
-  selId = id;
+async function openEditor(id, opts = {}) {
+  if (draft && draft.id !== id && !(await leaveDraft())) return;
   const m = cfg.macros.find(x => x.id === id);
-  draft = m ? clone(m) : null;
+  if (!m) return;
+  if (view !== "editor") backView = view;
+  selId = id; draft = clone(m);
   dirty = false; history = []; selAct = -1; pickMode = false; expandPaths = false;
-  renderEditor(); renderMacroList(); updateAssignKB();
+  setView("editor", opts);
+  renderEditor();
 }
+
+$("#edBack").onclick = async () => {
+  if (!(await leaveDraft())) return;
+  const d = draft;
+  draft = null; selId = null; dirty = false; pickMode = false;
+  if (d && normTrig(d.trigger) && backView === "keys") {
+    selKey = normTrig(d.trigger);
+    if (!ieq(d.app, profile)) setProfile(profiles().find(p => ieq(p, d.app)) ?? "");
+  }
+  setView(backView);
+};
 
 // ---------- editor ----------
 function markDirty() {
@@ -662,10 +875,8 @@ function renderAppSelect() {
 }
 
 function renderEditor() {
-  $("#editorEmpty").hidden = !!draft;
-  $("#editorBody").hidden = !draft;
-  updateAssignKB();
   if (!draft) return;
+  setHash();
   $("#saveMacro").textContent = dirty ? "Kaydet •" : "Kaydet";
   $("#saveMacro").classList.toggle("dirty", dirty);
   $("#undoBtn").disabled = !history.length;
@@ -706,7 +917,7 @@ function updateRate() {
   $("#actDur").textContent = d ? "≈ " + fmtMs(d) + " sürer" : "";
 }
 
-$("#mName").oninput = e => { draft.name = e.target.value; markDirty(); const n = $(`.mitem[data-id="${draft.id}"] .n`); if (n) n.textContent = draft.name || "Adsız"; };
+$("#mName").oninput = e => { draft.name = e.target.value; markDirty(); };
 $("#mEnabled").onchange = e => { snapshot(); draft.enabled = e.target.checked; markDirty(); };
 $("#mTrigger").onchange = e => { snapshot(); draft.trigger = normTrig(e.target.value) || e.target.value.trim(); markDirty(); renderEditor(); };
 $("#mInterval").oninput = e => { draft.interval_ms = +e.target.value; updateRate(); markDirty(); };
@@ -726,15 +937,15 @@ $("#captureBtn").onclick = async () => {
   if (!t) return;
   snapshot(); draft.trigger = t; markDirty(); renderEditor();
 };
-$("#pickKeyBtn").onclick = () => { pickMode = !pickMode; renderEditor(); if (pickMode) $(".kb-card").scrollIntoView({ behavior: "smooth", block: "nearest" }); };
+$("#pickKeyBtn").onclick = () => { pickMode = true; mods.clear(); setView("keys"); };
 $("#undoBtn").onclick = undo;
 // one undo step per focused text field edit
-$("#editorBody").addEventListener("focusin", e => { if (e.target.matches("input:not([type=checkbox]), textarea")) snapshot(); });
+$("#viewEditor").addEventListener("focusin", e => { if (e.target.matches("input:not([type=checkbox]), textarea")) snapshot(); });
 
 document.addEventListener("keydown", e => {
   if (!$("#modal").hidden || !$("#overlay").hidden) return;
   const inField = e.target.matches("input, textarea, select");
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && draft && $("#tab-macros").classList.contains("active")) { e.preventDefault(); saveMacro(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && draft && view === "editor" && $("#tab-macros").classList.contains("active")) { e.preventDefault(); saveMacro(); }
   else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !inField && draft) { e.preventDefault(); undo(); }
   else if (e.key === "Escape") { if (pickMode) { pickMode = false; renderEditor(); } else if (mods.size) { mods.clear(); updateAssignKB(); } closeKeyMenu(); }
   else if ((e.key === "Delete") && !inField && draft && selAct >= 0 && draft.actions[selAct]) { snapshot(); draft.actions.splice(selAct, 1); selAct = Math.min(selAct, draft.actions.length - 1); markDirty(); renderActions(); updateRate(); }
@@ -773,6 +984,8 @@ const PRESET_KEYS = [["", "hazır…"], ["playpause", "Oynat / duraklat"], ["nex
   ["ctrl+c", "Kopyala"], ["ctrl+v", "Yapıştır"], ["ctrl+x", "Kes"], ["ctrl+z", "Geri al"], ["ctrl+shift+esc", "Görev yöneticisi"], ["win+d", "Masaüstünü göster"], ["win+l", "Kilitle"],
   ["win+shift+s", "Ekran alıntısı"], ["alt+tab", "Pencere değiştir"], ["alt+f4", "Pencereyi kapat"], ["browserback", "Tarayıcı geri"], ["browserfwd", "Tarayıcı ileri"], ["calc", "Hesap makinesi"]];
 
+// suggestions for "Tuşa bas" fields (native datalist: type freely or pick)
+document.body.insertAdjacentHTML("beforeend", `<datalist id="keyPresets">${PRESET_KEYS.filter(([v]) => v).map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</datalist>`);
 $("#palette").innerHTML = PALETTE.map(([g, items]) => `<div><div class="pal-group-title">${g}</div><div class="pal-items">${items.map(([t, l]) => `<button data-add="${t}">${icon(PAL_IC[t] || TYPES[t].ic, "sm")}${l}</button>`).join("")}</div></div>`).join("");
 $$("#palette [data-add]").forEach(b => b.onclick = () => { $("#palette").hidden = true; addAction(NEW_ACT[b.dataset.add]()); });
 $("#palette").onclick = e => e.stopPropagation();
@@ -807,7 +1020,7 @@ function fieldsHTML(a, i) {
   switch (a.type) {
     case "click": return `<select data-i="${i}" data-k="button">${btnOpts(a.button)}</select> ${sel("count", [["1", "tek"], ["2", "çift"], ["3", "üçlü"]], "1")} basılı ${inp("hold_ms", "0", "w-s", "number")} ms`;
     case "mousedown": case "mouseup": return `<select data-i="${i}" data-k="button">${btnOpts(a.button)}</select>`;
-    case "keys": return `${inp("keys", "ctrl+shift+esc")} <button class="btn sm" data-cap="${i}">Yakala</button> <select data-preset="${i}" class="w-s">${PRESET_KEYS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select> basılı ${inp("hold_ms", "0", "w-s", "number")} ms`;
+    case "keys": return `${inp("keys", "ctrl+c · yaz ya da seç").replace("<input ", '<input list="keyPresets" ')} <button class="btn sm" data-cap="${i}">Yakala</button> <span class="hold">basılı ${inp("hold_ms", "0", "w-s", "number")} ms</span>`;
     case "keydown": case "keyup": return `${inp("keys", "space")} <button class="btn sm" data-cap="${i}">Yakala</button>`;
     case "delay": return a.ms_max ? `${inp("ms", "80", "w-s", "number")} – ${inp("ms_max", "160", "w-s", "number")} ms arası rastgele` : `${inp("ms", "100", "w-s", "number")} ms <button class="btn sm ghost" data-rand="${i}" title="Aralıktan rastgele bekle">${icon("i-dice", "sm")}rastgele</button>`;
     case "move": return `X ${inp("x", "0", "w-s", "number")} Y ${inp("y", "0", "w-s", "number")} ${chk("rel", "göreli")} <button class="btn sm" data-pos="${i}" title="3 saniye içinde imleci hedefe götür">Konumu al</button>`;
@@ -1012,12 +1225,12 @@ function newMacro(kind, trigger = "") {
   const tpl = TEMPLATES[kind]();
   const m = { id: uid(), enabled: true, app: profile, passthrough: false, repeat: 1, trigger, ...tpl };
   if (!m.name) m.name = autoName(trigger);
-  // not added to cfg.macros until saved; the list shows the draft as "yeni"
-  selId = m.id; draft = m; dirty = true; history = []; selAct = -1; expandPaths = false;
-  pickMode = !trigger;
-  renderEditor(); markDirty(); renderMacroList();
-  $("#editor").scrollIntoView({ behavior: "smooth", block: "start" });
-  if (!trigger) toast("Şimdi klavyede tetikleyici tuşa tıkla (ya da Yakala)");
+  // not added to cfg.macros until saved
+  if (view !== "editor") backView = view;
+  selId = m.id; draft = m; dirty = true; history = []; selAct = -1; expandPaths = false; pickMode = false;
+  setView("editor");
+  renderEditor(); markDirty();
+  if (!trigger) toast("Tetikleyiciyi seç: “Tuşa basarak seç” ya da “Klavyeden seç”");
   if (kind === "record") startRecording();
 }
 $("#newMacroBtn").onclick = e => { e.stopPropagation(); closeMenus("#newMenu"); $("#newMenu").hidden = !$("#newMenu").hidden; };
@@ -1029,16 +1242,18 @@ $$("#newMenu button").forEach(b => b.onclick = async () => {
 
 async function saveMacro() {
   if (!draft) return false;
+  let msg = "Makro kaydedildi";
   if (draft.enabled && !normTrig(draft.trigger)) {
-    toast("Önce bir tetikleyici seç: klavyede bir tuşa tıkla ya da Yakala", true);
-    pickMode = true; renderEditor(); return false;
+    // no trigger yet: keep it in the library, switched off, instead of refusing to save
+    draft.enabled = false;
+    msg = "Kaydedildi; tetikleyici olmadığı için kapalı";
   }
   if (!draft.name.trim()) draft.name = autoName(draft.trigger);
   draft.trigger = normTrig(draft.trigger) || draft.trigger;
   const i = cfg.macros.findIndex(x => x.id === draft.id);
   const backup = clone(cfg.macros);
   if (i >= 0) cfg.macros[i] = clone(draft); else cfg.macros.push(clone(draft));
-  if (await saveCfg("Makro kaydedildi")) {
+  if (await saveCfg(msg)) {
     dirty = false; extraProfiles = extraProfiles.filter(p => !ieq(p, draft.app));
     renderEditor(); renderMacroList();
     return true;
@@ -1053,7 +1268,7 @@ $("#delMacro").onclick = async () => {
   cfg.macros = cfg.macros.filter(x => x.id !== draft.id);
   draft = null; selId = null; dirty = false;
   await saveCfg("Silindi");
-  renderMacroList(); renderEditor();
+  setView(backView);
 };
 $("#dupMacro").onclick = async () => {
   if (!(await leaveDraft())) return;
@@ -1316,8 +1531,9 @@ async function loadAll() {
   if (!profiles().some(p => ieq(p, profile))) profile = "";
   setProfile(profile);
   renderHomeCfg(); renderLightCfg(); renderAdvCfg(); renderGameCfg();
-  if (selId && !dirty) { const m = cfg.macros.find(x => x.id === selId); draft = m ? clone(m) : null; }
-  renderEditor(); renderMacroList(); updateAssignKB();
+  if (draft && !dirty) { const m = cfg.macros.find(x => x.id === draft.id); if (m) draft = clone(m); }
+  if (view === "editor" && draft) renderEditor();
+  renderMacroList(); updateAssignKB(); renderKeyPanel();
   decorateFKeys($("#kbHome")); decorateFKeys($("#kbLight"));
 }
 window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
@@ -1329,8 +1545,8 @@ buildKB($("#kbLight"), false);
 (async () => {
   try { await loadAll(); } catch (e) { toast("Bağlantı hatası: " + e.message, true); }
   await refreshState();
-  const t = store.get("tab", "home");
-  if (t !== "home") go(t);
+  route();
+  window.addEventListener("hashchange", route);
   setInterval(refreshState, 2000);
   setInterval(async () => {
     if (controls.length) return;

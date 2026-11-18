@@ -1,6 +1,12 @@
 # Değişiklikler
 
 ## v0.3.1
+- Atamalar baştan düzenlendi:
+  - **Klavye** görünümü: tuşa tıklayınca sağdaki panelde ne yaptığı görünür (düzenle, dene, aç/kapa, atamayı kaldır). Boş tuşa tek tıkla kısayol, metin, program, medya tuşu ya da turbo atanır; var olan bir makro bağlanabilir.
+  - **Makrolar** görünümü: bütün makrolar profile göre gruplu tabloda; satırdan dene, çoğalt, sil.
+  - Makro editörü ayrı, tam genişlikte bir sayfa: solda tetikleyici, profil ve çalışma şekli, sağda eylemler. Tetikleyicisiz makro da kaydedilebilir (kapalı olarak).
+  - Her görünümün adresi var (`#/macros/list`, `#/macros/edit/<id>` …).
+- README ekran görüntüleri yenilendi.
 - Elle seçilen arka ışık (arayüz, tray, makro ya da klavyenin kendi tuşları) artık hatırlanıyor: yeniden başlatınca geri gelir, bir sonraki kural değişimine kadar geçerli kalır. Önceden her başlatmada gece kuralı ışığı düşük seviyeye çekiyordu.
 - Parlaklık çubukları tıklanan seviyeye doğru tek tek yanıp sönerek ilerliyor, klavye yanıt verene kadar takılmış görünmüyor.
 
