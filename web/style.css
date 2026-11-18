@@ -144,6 +144,14 @@ details.card[open] > summary { margin-bottom: 14px; }
 .w-180 { width: 200px !important; }
 kbd { font: 500 12px var(--mono); background: var(--surface); border: 1px solid var(--line-2); border-radius: 6px; padding: 1px 6px; color: var(--text); }
 .note { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13.5px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+.alert { display: flex; align-items: flex-start; gap: 14px; margin: 0 0 18px; padding: 16px 18px; border-radius: 14px; border: 1px solid #ff636955; background: #ff636910; }
+.alert > .ic { color: var(--bad); margin-top: 2px; }
+.alert-body { flex: 1; min-width: 0; }
+.alert-body b { display: block; font-weight: 600; margin-bottom: 2px; }
+.alert-body p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.alert .btn { flex: none; align-self: center; }
+.alert.done { border-color: #3dd68c55; background: #3dd68c10; }
+.alert.done > .ic { color: var(--ok); }
 .note.warn { border-color: #ffca1640; color: #f1dd9a; }
 
 /* ---------- controls ---------- */

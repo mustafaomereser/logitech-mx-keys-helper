@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## v0.3.7
+- **Interception uyarısı:** Interception filtre sürücüsü kuruluysa (bazı makro ve oyun araçları kurar) MX Helper açılışta bildirim verir ve Genel bakış'ta uyarı gösterir. Bu sürücü Bluetooth klavye her uykudan uyandığında bir yer harcar; yerler bitince klavye yeniden başlatana kadar çalışmaz. "Sadece ses tuşları çalışıyor" takılmasının asıl sebebi buydu.
+  - Uyarıdaki **Kaldır** düğmesi Interception'ı klavye/fare sürücü listesinden çıkarır (yönetici izni ister; Windows'un kendi sürücüleri kalır). Ardından bilgisayarı yeniden başlatmak gerekir.
+  - Interception kuruluyken onarım boşuna çalıştırılmaz; yeniden başlatmak gerektiği söylenir.
+  - Tanılama raporu klavye/fare sınıf filtrelerini de listeler.
+
 ## v0.3.6
 - **Defender yanlış alarmı (Trojan:Win32/Bearfoos.A!ml) için önlemler:** exe artık sürüm bilgisi (şirket, açıklama, sürüm) ve uygulama bildirimi (manifest) taşıyor, sembolleri silinmiyor. Onarım komutları gizlenmiş (`-EncodedCommand`) değil, `%APPDATA%\MXHelper\scripts` içindeki düz `.ps1` dosyalarıyla çalışıyor. Bu, imzasız bir programın yapay zekâ tabanlı tespitten tamamen kurtulacağının garantisi değil; tespit sürerse Microsoft'a yanlış alarm olarak bildirilmeli.
 

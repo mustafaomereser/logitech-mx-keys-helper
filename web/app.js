@@ -299,6 +299,30 @@ function liveKeys(on) {
 }
 document.addEventListener("visibilitychange", () => liveKeys(!document.hidden && currentTab() === "home"));
 
+// ---------- Interception warning ----------
+function renderInterception() {
+  const box = $("#icpWarn");
+  box.hidden = !st.interception && !st.interception_removed;
+  box.classList.toggle("done", !st.interception && !!st.interception_removed);
+  $("#icpRemove").hidden = !st.interception;
+  if (!st.interception && st.interception_removed) {
+    $("#icpTitle").textContent = "Interception kaldırıldı — bilgisayarı yeniden başlat";
+    $("#icpText").textContent = "Sürücü yeniden başlatana kadar bellekte kalıyor. Yeniden başlattıktan sonra klavye uykudan uyanınca takılmaz.";
+  }
+}
+$("#icpRemove").onclick = async () => {
+  const ok = await ask("Interception kaldırılsın mı?",
+    "Klavye ve fare sürücü listesinden Interception çıkarılır; Windows’un kendi sürücüleri kalır. Yönetici izni istenir, sonra bilgisayarı yeniden başlatman gerekir. Interception kullanan bir makro ya da oyun aracın varsa o çalışmaz.",
+    "Kaldır", true);
+  if (!ok) return;
+  const b = $("#icpRemove");
+  b.disabled = true; b.textContent = "Bekleniyor…";
+  try { await api("POST", "/api/interception/remove"); toast("Interception kaldırıldı. Bilgisayarı yeniden başlat."); }
+  catch (e) { toast(e.message, true); }
+  b.disabled = false; b.textContent = "Kaldır";
+  refreshState();
+};
+
 // ---------- window chrome ----------
 // In MX Helper's own window (cookie mxw=1) the page draws the title bar; dragging,
 // resizing from the top edge and the window buttons are forwarded to the host.
@@ -425,6 +449,7 @@ function renderHomeState() {
   $("#repairLvl").textContent = lvl ? `başarılı onarım · son işe yarayan: seviye ${lvl}` : "başarılı onarım";
   $("#autostart").checked = st.autostart;
   $("#elevInfo").textContent = st.elevated ? "Şu an yönetici olarak çalışıyor." : "Şu an normal kullanıcı olarak çalışıyor; onarım yönetici izni isteyecek.";
+  renderInterception();
   const w = $("#logiWarn");
   w.hidden = !st.logi_apps.length;
   w.textContent = st.logi_apps.length ? `Açık Logitech yazılımı: ${st.logi_apps.join(", ")}. Özel tuşlar ve ışık ayarları onlarla çakışabilir.` : "";

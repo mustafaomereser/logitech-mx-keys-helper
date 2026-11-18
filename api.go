@@ -227,6 +227,13 @@ func startGUIServer() error {
 		openReleasePage()
 		writeJSON(w, map[string]any{"ok": true})
 	})
+	api("POST /api/interception/remove", func(w http.ResponseWriter, r *http.Request) {
+		if !removeInterception() {
+			httpErr(w, "Kaldırılamadı: yönetici izni verilmedi ya da kayıt defteri değiştirilemedi.")
+			return
+		}
+		writeJSON(w, map[string]bool{"ok": true})
+	})
 	api("GET /api/window", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]bool{"max": guiMaximized()})
 	})
@@ -368,6 +375,9 @@ type apiStateResp struct {
 	GameMode   bool           `json:"game_mode"`
 	GameReason string         `json:"game_mode_reason"`
 	Update     updateInfo     `json:"update"`
+	// Interception filter driver installed / removed this session (reboot pending)
+	Interception        bool `json:"interception"`
+	InterceptionRemoved bool `json:"interception_removed"`
 }
 
 var autostartCache struct {
@@ -392,7 +402,9 @@ func apiState(w http.ResponseWriter, r *http.Request) {
 	ov := mgr.blOverride != nil
 	mgr.mu.Unlock()
 	gm, gr := gameModeActive()
+	icp, icpGone := interceptionState()
 	writeJSON(w, apiStateResp{
+		Interception: icp, InterceptionRemoved: icpGone,
 		GameMode: gm, GameReason: gr, Update: updateSnapshot(),
 		Version: version, Connected: conn, Name: name, Battery: b,
 		Backlight: map[string]any{"known": blKnown, "enabled": bl.Enabled != 0, "mode": bl.Mode(), "level": bl.Level, "levels": bl.Levels},

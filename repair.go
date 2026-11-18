@@ -126,6 +126,16 @@ func runPowerShell(script string, elevated bool) error {
 }
 
 func (r *repairState) repair(reason string) {
+	if present, removed := interceptionState(); present || removed {
+		// slots of the Interception driver are only freed by a reboot; no repair level helps
+		logf("Onarım atlandı (%s): Interception sürücüsü yüzünden sadece yeniden başlatma düzeltir", reason)
+		if present {
+			notifyAction("Onarım işe yaramaz: Interception kurulu", "Klavye bu sürücü yüzünden takıldı; sadece yeniden başlatmak düzeltir. Kalıcı çözüm için arayüzden kaldır.", openGUI)
+		} else {
+			notify("Bilgisayarı yeniden başlat", "Interception kaldırıldı ama hâlâ bellekte; klavye yeniden başlatınca düzelir ve bir daha takılmaz.")
+		}
+		return
+	}
 	r.mu.Lock()
 	if r.running {
 		r.mu.Unlock()

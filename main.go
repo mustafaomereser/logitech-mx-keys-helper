@@ -53,6 +53,7 @@ func main() {
 	go watchConfig()
 	go watchGameMode()
 	go watchUpdates()
+	go checkInterceptionAtStart()
 	go mgr.run()
 	go func() {
 		time.Sleep(4 * time.Second)
