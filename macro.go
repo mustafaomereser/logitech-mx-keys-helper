@@ -64,10 +64,16 @@ func (e *macroEngine) has(trigger string) bool {
 	return len(e.byTrigger[trigger]) > 0 || (trigger != "" && trigger == e.stopCombo)
 }
 
-// pick returns the macro for a trigger, preferring one bound to the foreground app.
-func (e *macroEngine) pick(trigger string) (Macro, bool) {
+// pickAct returns the macro for a trigger and activation ("" | long | multi),
+// preferring one bound to the foreground app.
+func (e *macroEngine) pickAct(trigger, act string) (Macro, bool) {
 	e.mu.Lock()
-	list := e.byTrigger[trigger]
+	var list []Macro
+	for _, m := range e.byTrigger[trigger] {
+		if m.Activation == act {
+			list = append(list, m)
+		}
+	}
 	e.mu.Unlock()
 	if len(list) == 0 {
 		return Macro{}, false
@@ -95,20 +101,132 @@ func (e *macroEngine) pick(trigger string) (Macro, bool) {
 	return Macro{}, false
 }
 
-// down handles a trigger press. Returns the macro, whether it was handled and whether to swallow the key.
-func (e *macroEngine) down(trigger string) (Macro, bool, bool) {
+// ---------- activation: press / long press / multi-tap ----------
+
+// heldState is one trigger that is currently down.
+type heldState struct {
+	m       Macro
+	fired   bool // the macro has started (immediately, or after the long-press delay)
+	long    bool // waiting for the long-press delay
+	swallow bool
+	replay  func() // re-sends the original input when a swallowed long press ends early
+	cancel  chan struct{}
+}
+
+type tapState struct {
+	n    int
+	last time.Time
+}
+
+var (
+	heldMu sync.Mutex
+	held   = map[string]*heldState{}
+	taps   = map[string]tapState{}
+)
+
+// press handles a trigger going down and returns whether to swallow the event.
+// It must stay fast: it runs inside the low-level hooks (timers run in goroutines).
+func (e *macroEngine) press(trigger string, replay func()) bool {
 	e.mu.Lock()
 	stop := e.stopCombo
 	e.mu.Unlock()
 	if trigger == stop && stop != "" {
 		e.stopAll()
 		notify("MX Helper", "Tüm makrolar durduruldu.")
-		return Macro{}, true, true
+		heldMu.Lock()
+		held[trigger] = &heldState{fired: true, swallow: true}
+		heldMu.Unlock()
+		return true
 	}
-	m, ok := e.pick(trigger)
-	if !ok {
-		return Macro{}, false, false
+	// multi-tap: earlier presses pass through, the n-th one runs the macro
+	if m, ok := e.pickAct(trigger, "multi"); ok {
+		need, win := max(m.Taps, 2), m.TapMs
+		if win <= 0 {
+			win = 350
+		}
+		now := time.Now()
+		heldMu.Lock()
+		ts := taps[trigger]
+		if now.Sub(ts.last) > time.Duration(win)*time.Millisecond {
+			ts.n = 0
+		}
+		ts.n++
+		ts.last = now
+		hit := ts.n >= need
+		if hit {
+			ts.n = 0
+			held[trigger] = &heldState{m: m, fired: true, swallow: !m.Passthrough}
+		}
+		taps[trigger] = ts
+		heldMu.Unlock()
+		if hit {
+			e.fire(m)
+			return !m.Passthrough
+		}
 	}
+	if m, ok := e.pickAct(trigger, ""); ok {
+		heldMu.Lock()
+		held[trigger] = &heldState{m: m, fired: true, swallow: !m.Passthrough}
+		heldMu.Unlock()
+		e.fire(m)
+		return !m.Passthrough
+	}
+	if m, ok := e.pickAct(trigger, "long"); ok {
+		hs := &heldState{m: m, long: true, swallow: !m.Passthrough, replay: replay, cancel: make(chan struct{})}
+		heldMu.Lock()
+		held[trigger] = hs
+		heldMu.Unlock()
+		d := m.LongMs
+		if d <= 0 {
+			d = 800
+		}
+		go func() {
+			t := time.NewTimer(time.Duration(d) * time.Millisecond)
+			defer t.Stop()
+			select {
+			case <-t.C:
+				heldMu.Lock()
+				still := held[trigger] == hs
+				if still {
+					hs.fired = true
+				}
+				heldMu.Unlock()
+				if still {
+					e.fire(hs.m)
+				}
+			case <-hs.cancel:
+			}
+		}()
+		return hs.swallow
+	}
+	return false
+}
+
+// release handles the trigger going up and returns whether to swallow the event.
+func (e *macroEngine) release(trigger string) bool {
+	heldMu.Lock()
+	hs := held[trigger]
+	delete(held, trigger)
+	fired := hs != nil && hs.fired
+	heldMu.Unlock()
+	if hs == nil {
+		return false
+	}
+	if hs.long && !fired {
+		close(hs.cancel)
+		if hs.swallow && hs.replay != nil {
+			go hs.replay() // released early: give the key its normal job back
+		}
+		return hs.swallow
+	}
+	if hs.m.ID != "" {
+		e.up(hs.m)
+	}
+	return hs.swallow
+}
+
+// fire starts (or, for toggle mode, stops) a macro according to its mode.
+func (e *macroEngine) fire(m Macro) {
 	e.mu.Lock()
 	r := e.running[m.ID]
 	e.mu.Unlock()
@@ -128,7 +246,6 @@ func (e *macroEngine) down(trigger string) (Macro, bool, bool) {
 			e.start(m, false)
 		}
 	}
-	return m, true, !m.Passthrough
 }
 
 func (e *macroEngine) up(m Macro) {
@@ -448,31 +565,19 @@ func queueMX(cid uint16, down bool) {
 	}
 }
 
-var (
-	mxHeldMu sync.Mutex
-	mxHeld   = map[uint16]Macro{}
-)
+func mxTrigger(cid uint16) string {
+	return normalizeTrigger("mx:0x" + strconv.FormatUint(uint64(cid), 16))
+}
 
+// Diverted MX keys have no normal job, so a long press released early needs no replay.
 func mxKeyDown(cid uint16) {
-	t := normalizeTrigger("mx:0x" + strconv.FormatUint(uint64(cid), 16))
+	t := mxTrigger(cid)
 	if capturer.offer(t) {
 		return
 	}
-	m, ok, _ := engine.down(t)
-	if !ok {
-		return
+	if engine.has(t) {
+		engine.press(t, nil)
 	}
-	mxHeldMu.Lock()
-	mxHeld[cid] = m
-	mxHeldMu.Unlock()
 }
 
-func mxKeyUp(cid uint16) {
-	mxHeldMu.Lock()
-	m, ok := mxHeld[cid]
-	delete(mxHeld, cid)
-	mxHeldMu.Unlock()
-	if ok {
-		engine.up(m)
-	}
-}
+func mxKeyUp(cid uint16) { engine.release(mxTrigger(cid)) }

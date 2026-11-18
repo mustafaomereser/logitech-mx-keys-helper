@@ -136,10 +136,32 @@ function normTrig(t) {
   const parts = t.split("+").filter(Boolean).map(p => ALIAS[p] || p);
   if (parts.length === 1 && ["mouse4", "mouse5", "middle"].includes(parts[0])) return parts[0];
   const ms = MODS.filter(m => parts.includes(m));
-  const main = parts.filter(p => !MODS.includes(p)).pop();
-  return main ? [...ms, main].join("+") : "";
+  // several normal keys (a chord like q+e) are sorted, like the Go side does
+  const mains = [...new Set(parts.filter(p => !MODS.includes(p)))].sort();
+  return mains.length ? [...ms, ...mains].join("+") : "";
 }
 const trigMain = t => { t = normTrig(t); return t.startsWith("mx:") ? t : t.split("+").pop(); };
+const trigMains = t => { t = normTrig(t); return !t || t.startsWith("mx:") ? [] : t.split("+").filter(p => !MODS.includes(p)); };
+
+// activation: when a trigger counts as pressed ("" = on press, long = held, multi = repeated taps)
+const actOf = m => (m && m.activation) || "";
+const sameAct = (a, b) => actOf(a) === actOf(b);
+const fmtSec = ms => (Math.round((ms || 800) / 100) / 10).toString().replace(".", ",");
+function actText(m) {
+  if (actOf(m) === "long") return `${fmtSec(m.long_ms)} sn basılı tutunca`;
+  if (actOf(m) === "multi") return `${m.taps || 2} kez art arda basınca`;
+  return "Basınca";
+}
+function actChip(m) {
+  if (actOf(m) === "long") return `<span class="chip act">${fmtSec(m.long_ms)} sn basılı</span>`;
+  if (actOf(m) === "multi") return `<span class="chip act">${m.taps || 2}× art arda</span>`;
+  return "";
+}
+function actFields(a) {
+  if (a.activation === "long") return { activation: "long", long_ms: a.long_ms || 800 };
+  if (a.activation === "multi") return { activation: "multi", taps: a.taps || 2, tap_ms: a.tap_ms || 350 };
+  return { activation: "" };
+}
 const trigMods = t => normTrig(t).split("+").slice(0, -1);
 
 const KEYLABEL = { esc: "Esc", delete: "Del", backspace: "⌫", tab: "Tab", capslock: "Caps", enter: "Enter", space: "Boşluk", left: "←", right: "→", up: "↑", down: "↓", ctrl: "Ctrl", alt: "Alt", shift: "Shift", win: "Win", playpause: "⏯", next: "⏭", prev: "⏮", mute: "🔇", volup: "🔊", voldown: "🔉", pgup: "PgUp", pgdn: "PgDn", printscreen: "PrtSc", plus: "=", minus: "-", comma: ",", period: "." };
@@ -414,6 +436,8 @@ $("#profileBtn").onclick = e => { e.stopPropagation(); const m = $("#profileMenu
 let view = "keys";
 let backView = "keys";
 let selKey = "";
+let addKeyMode = false; // next key click extends the selected combination
+let kpAct = { activation: "", long_ms: 800, taps: 2, tap_ms: 350 }; // "Ne zaman" in the key panel
 
 function setView(v, opts = {}) {
   view = v;
@@ -480,8 +504,8 @@ function updateAssignKB() {
   const bound = boundMap();
   const selTrig = pickMode && draft ? normTrig(draft.trigger) : selKey;
   const modsKey = MODS.filter(m => mods.has(m));
-  const selMain = selTrig && !selTrig.startsWith("mx:") ? trigMain(selTrig) : "";
-  const selMods = selTrig ? trigMods(selTrig) : [];
+  const selMains = trigMains(selTrig);
+  const selMods = selTrig && !selTrig.startsWith("mx:") ? normTrig(selTrig).split("+").filter(p => MODS.includes(p)) : [];
   for (const k of KB) {
     const b = $(`[data-k="${k.id}"]`, el);
     if (!b) continue;
@@ -492,10 +516,11 @@ function updateAssignKB() {
     } else {
       const name = keyName(k);
       const t = name ? normTrig([...modsKey, name].join("+")) : "";
-      if (t) { state = bound[t] || ""; sel = name === selMain; }
+      if (t) { state = bound[t] || ""; sel = selMains.includes(name); }
       const c = k.fkey && fkeyControl(k.fkey);
       if (c && !modsKey.length) { state = state || bound[c.cid] || ""; sel = sel || c.cid === selTrig; }
-      if (!state && name && Object.keys(bound).some(x => !x.startsWith("mx:") && trigMain(x) === name)) state = "inh";
+      // part of a combination or chord that is bound: show it faintly
+      if (!state && name && Object.keys(bound).some(x => trigMains(x).includes(name))) state = "inh";
     }
     b.classList.toggle("own", state === "own");
     b.classList.toggle("inh", state === "inh");
@@ -514,11 +539,15 @@ function updateAssignKB() {
   el.classList.toggle("picking", pickMode);
   const hint = $("#kbHint");
   hint.classList.toggle("picking", pickMode || mods.size > 0);
+  hint.classList.toggle("picking", pickMode || mods.size > 0 || addKeyMode);
   hint.innerHTML = pickMode ? `“${esc(draft ? draft.name : "")}” için tetikleyici seç: bir tuşa tıkla. <a href="#" id="pickCancel">Vazgeç</a>`
+    : addKeyMode ? `<b>${esc(trigText(selKey))} + …</b> kombinasyona eklenecek tuşa tıkla. <a href="#" id="addCancel">Vazgeç</a>`
     : mods.size ? `<b>${MODS.filter(m => mods.has(m)).map(keyLabel).join(" + ")} + …</b> şimdi ana tuşa tıkla.`
       : "Kombinasyon için önce <b>Ctrl</b>, <b>Alt</b>, <b>Shift</b> ya da <b>Win</b>’e tıkla.";
   const pc = $("#pickCancel");
   if (pc) pc.onclick = e => { e.preventDefault(); pickMode = false; setView("editor"); };
+  const ac = $("#addCancel");
+  if (ac) ac.onclick = e => { e.preventDefault(); addKeyMode = false; updateAssignKB(); renderKeyPanel(); };
 }
 
 let keyMenuEl = null;
@@ -568,6 +597,12 @@ $$(".mbtn").forEach(b => b.onclick = () => handleKeyTrigger(b.dataset.trig));
 function handleKeyTrigger(t) {
   t = normTrig(t);
   if (!t) return;
+  if (addKeyMode) {
+    // grow the selected combination: ctrl+q  +  e  ->  ctrl+e+q
+    addKeyMode = false;
+    const plain = s => s && !s.startsWith("mx:") && !["mouse4", "mouse5", "middle"].includes(s);
+    if (plain(selKey) && plain(t)) t = normTrig(selKey + "+" + t);
+  }
   if (pickMode && draft) {
     snapshot();
     draft.trigger = t; pickMode = false; markDirty();
@@ -624,7 +659,7 @@ const modeName = { press: "Bir kez", hold: "Basılı tuttukça", toggle: "Aç / 
 function macroCardHTML(m, inh) {
   return `<div class="kp-macro ${m.enabled ? "" : "off"}">
     <div class="kp-mhead">
-      <div><b>${esc(m.name || "Adsız")}</b><span class="kp-mode">${modeName[m.mode] || m.mode}${inh ? " · varsayılan profilden" : ""}</span></div>
+      <div><span class="kp-act">${esc(actText(m))}</span><b>${esc(m.name || "Adsız")}</b><span class="kp-mode">${modeName[m.mode] || m.mode}${inh ? " · varsayılan profilden" : ""}</span></div>
       <label class="switch" title="Etkin"><input type="checkbox" data-kpen="${esc(m.id)}" ${m.enabled ? "checked" : ""}><span></span></label>
     </div>
     <ol class="kp-acts">${(m.actions || []).filter(a => a.type !== "delay").slice(0, 4).map(a => `<li>${esc(actionText(a))}</li>`).join("") || "<li>Eylem yok</li>"}</ol>
@@ -663,20 +698,36 @@ function renderKeyPanel() {
     return;
   }
   const own = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger) === selKey);
-  const inh = profile ? cfg.macros.filter(m => !m.app && normTrig(m.trigger) === selKey) : [];
+  const inh = profile ? cfg.macros.filter(m => !m.app && normTrig(m.trigger) === selKey && !own.some(o => sameAct(o, m))) : [];
+  const plainKey = !selKey.startsWith("mx:") && !["mouse4", "mouse5", "middle"].includes(selKey);
   let html = `<div class="kp-head"><div class="kp-trig">${triggerHTML(selKey)}</div><button class="icon-btn" id="kpClose" title="Kapat">${icon("i-x", "sm")}</button></div>
-    <div class="kp-sub">${profile ? esc(profLabel(profile)) + " profili" : "Varsayılan profil · bütün programlar"}</div>`;
-  if (own.length) {
-    html += own.map(m => macroCardHTML(m)).join("");
-    if (own.filter(m => m.enabled).length > 1) html += `<div class="conflict">Bu tuşa birden çok etkin makro bağlı; yalnızca biri çalışır.</div>`;
-  } else {
-    if (inh.length) html += macroCardHTML(inh[0], true) + `<div class="kp-label">Bu profilde başka bir şey yapsın</div>`;
-    else html += `<div class="kp-label">Bu tuş boş. Ne yapsın?</div>`;
+    <div class="kp-sub">${profile ? esc(profLabel(profile)) + " profili" : "Varsayılan profil · bütün programlar"}</div>
+    ${plainKey ? `<button class="btn ghost sm kp-addkey ${addKeyMode ? "active" : ""}" id="kpAddKey">${icon("i-plus", "sm")}${addKeyMode ? "Eklenecek tuşa tıkla…" : "Tuş ekle (kombinasyon)"}</button>` : ""}`;
+  // what is already bound to this key, for every activation
+  html += own.map(m => macroCardHTML(m)).join("") + inh.map(m => macroCardHTML(m, true)).join("");
+  const dupe = own.filter(m => m.enabled).some((m, i, a) => a.findIndex(o => sameAct(o, m)) !== i);
+  if (dupe) html += `<div class="conflict">Bu tuşa aynı şekilde çalışan birden çok makro bağlı; yalnızca biri çalışır.</div>`;
+
+  // add something for the chosen activation
+  const taken = own.some(m => sameAct(m, kpAct));
+  html += `<div class="kp-when">
+      <div class="kp-label">${own.length ? "Bu tuşa bir şey daha ekle" : "Bu tuş boş. Ne zaman, ne yapsın?"}</div>
+      <div class="seg kp-actseg" id="kpActSeg"><button data-v="">Basınca</button><button data-v="long">Basılı tutunca</button><button data-v="multi">Art arda</button></div>
+      ${kpAct.activation === "long" ? `<div class="kp-param"><span class="unit"><input type="number" id="kpLong" min="0.2" max="30" step="0.1" value="${(kpAct.long_ms / 1000)}"><span>sn</span></span> basılı tutunca. Kısa basarsan tuş normal işini yapar.</div>` : ""}
+      ${kpAct.activation === "multi" ? `<div class="kp-param"><input type="number" id="kpTaps" min="2" max="10" value="${kpAct.taps}" class="num"> kez, aralarında en fazla <span class="unit"><input type="number" id="kpTapMs" min="100" max="2000" step="50" value="${kpAct.tap_ms}"><span>ms</span></span></div>` : ""}
+    </div>`;
+  if (taken) html += `<div class="kp-note">“${esc(actText(kpAct))}” için zaten bir makro var; yukarıdan düzenleyebilirsin.</div>`;
+  else {
     html += `<div class="kp-quick">${QUICK.map(([k, ic, t, d]) => `<button data-q="${k}">${icon(ic, "sm")}<span><b>${t}</b><small>${d}</small></span></button>`).join("")}</div>`;
-    const bindable = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger) !== selKey);
-    if (bindable.length) html += `<button class="btn ghost sm kp-bind" id="kpBind">${icon("i-link", "sm")}Var olan bir makroyu bu tuşa bağla</button>`;
+    const bindable = cfg.macros.filter(m => inProfile(m, profile) && !(normTrig(m.trigger) === selKey && sameAct(m, kpAct)));
+    if (bindable.length) html += `<button class="btn ghost sm kp-bind" id="kpBind">${icon("i-link", "sm")}Var olan bir makroyu buna bağla</button>`;
   }
   p.innerHTML = html;
+  seg($("#kpActSeg"), kpAct.activation, v => { kpAct.activation = v; renderKeyPanel(); });
+  const kl = $("#kpLong"); if (kl) kl.onchange = () => { kpAct.long_ms = Math.max(200, Math.round(parseFloat(kl.value.replace(",", ".")) * 1000) || 800); renderKeyPanel(); };
+  const kt = $("#kpTaps"); if (kt) kt.onchange = () => { kpAct.taps = Math.min(10, Math.max(2, +kt.value || 2)); renderKeyPanel(); };
+  const km = $("#kpTapMs"); if (km) km.onchange = () => { kpAct.tap_ms = Math.min(2000, Math.max(100, +km.value || 350)); };
+  const ak = $("#kpAddKey"); if (ak) ak.onclick = () => { addKeyMode = !addKeyMode; updateAssignKB(); renderKeyPanel(); };
   $("#kpClose").onclick = () => { selKey = ""; updateAssignKB(); renderKeyPanel(); };
   $$("[data-kpedit]", p).forEach(b => b.onclick = () => openEditor(b.dataset.kpedit));
   $$("[data-kptest]", p).forEach(b => b.onclick = async () => { await api("POST", "/api/macro/test", cfg.macros.find(m => m.id === b.dataset.kptest)); toast("2 sn sonra bir kez çalışacak — hedef pencereye geç"); });
@@ -697,7 +748,7 @@ function renderKeyPanel() {
 }
 
 async function addAssigned(m, msg) {
-  m = { id: uid(), enabled: true, app: profile, passthrough: false, repeat: 1, mode: "press", trigger: selKey, ...m };
+  m = { id: uid(), enabled: true, app: profile, passthrough: false, repeat: 1, mode: "press", trigger: selKey, ...actFields(kpAct), ...m };
   cfg.macros.push(m);
   if (!(await saveCfg(msg || "Atandı"))) { cfg.macros = cfg.macros.filter(x => x.id !== m.id); return; }
   updateAssignKB(); renderKeyPanel(); renderMacroList();
@@ -709,7 +760,7 @@ async function quickAssign(kind) {
   const t = selKey;
   if (kind === "record" || kind === "blank") {
     if (!(await leaveDraft())) return;
-    newMacro(kind, t);
+    newMacro(kind, t, actFields(kpAct));
     return;
   }
   if (kind === "shortcut") {
@@ -746,6 +797,7 @@ async function bindExisting() {
   });
   if (!v) return;
   const m = cfg.macros.find(x => x.id === v);
+  Object.assign(m, actFields(kpAct));
   m.trigger = selKey; m.enabled = true;
   if (await saveCfg(`“${m.name}” bu tuşa bağlandı`)) { updateAssignKB(); renderKeyPanel(); }
 }
@@ -763,14 +815,14 @@ function renderMacroList() {
     list.innerHTML = `<div class="kp-empty">${icon("i-assign", "xl")}<b>${q ? "Eşleşen makro yok" : "Henüz makro yok"}</b><p>${q ? "Başka bir şey ara." : "Klavye görünümünde bir tuşa tıkla ya da “Yeni makro” ile başla."}</p></div>`;
     return;
   }
-  const conflictOf = m => m.enabled && normTrig(m.trigger) && cfg.macros.some(o => o.id !== m.id && o.enabled && ieq(o.app, m.app) && normTrig(o.trigger) === normTrig(m.trigger));
+  const conflictOf = m => m.enabled && normTrig(m.trigger) && cfg.macros.some(o => o.id !== m.id && o.enabled && ieq(o.app, m.app) && sameAct(o, m) && normTrig(o.trigger) === normTrig(m.trigger));
   list.innerHTML = `<div class="mrow mhead"><span></span><span>Makro</span><span>Tetikleyici</span><span>Çalışma</span><span></span></div>` + groups.map(g => `
     <div class="mgroup">${esc(g.p ? profLabel(g.p) : "Varsayılan")}<span>${g.p ? esc(g.p) : "bütün programlar"}</span></div>
     ${g.ms.map(m => `
       <div class="mrow ${m.enabled ? "" : "off"}" data-id="${esc(m.id)}">
         <label class="switch" title="Etkin"><input type="checkbox" data-en="${esc(m.id)}" ${m.enabled ? "checked" : ""}><span></span></label>
         <div class="mr-name"><b>${esc(m.name || "Adsız")}</b><span>${esc(macroSummary(m))}</span></div>
-        <div class="mr-trig">${normTrig(m.trigger) ? triggerHTML(m.trigger) : '<span class="faint">atanmamış</span>'}${conflictOf(m) ? '<span class="chip warn">çakışma</span>' : ""}</div>
+        <div class="mr-trig">${normTrig(m.trigger) ? triggerHTML(m.trigger) + actChip(m) : '<span class="faint">atanmamış</span>'}${conflictOf(m) ? '<span class="chip warn">çakışma</span>' : ""}</div>
         <div class="mr-mode"><span class="chip mode-${m.mode}">${modeName[m.mode] || m.mode}</span>${running.has(m.id) ? '<span class="chip run">çalışıyor</span>' : ""}</div>
         <div class="mr-tools">
           <button class="icon-btn" data-test="${esc(m.id)}" title="Dene">${icon("i-play", "sm")}</button>
@@ -861,7 +913,7 @@ function undo() {
 function updateConflict() {
   if (!draft) return;
   const t = normTrig(draft.trigger);
-  const other = t && cfg.macros.find(o => o.id !== draft.id && o.enabled && ieq(o.app, draft.app) && normTrig(o.trigger) === t);
+  const other = t && cfg.macros.find(o => o.id !== draft.id && o.enabled && ieq(o.app, draft.app) && sameAct(o, draft) && normTrig(o.trigger) === t);
   const c = $("#conflict");
   c.hidden = !other;
   if (other) c.textContent = `⚠ “${other.name}” de aynı tetikleyiciyi kullanıyor; ikisinden yalnızca biri çalışır.`;
@@ -887,6 +939,21 @@ function renderEditor() {
   $("#pickKeyBtn").classList.toggle("active", pickMode);
   renderAppSelect();
   seg($("#modeSeg"), draft.mode || "press", v => { snapshot(); draft.mode = v; markDirty(); renderEditor(); });
+  const act = actOf(draft);
+  seg($("#mActSeg"), act, v => {
+    snapshot();
+    Object.assign(draft, actFields({ ...draft, activation: v }));
+    if (!v) { delete draft.long_ms; delete draft.taps; delete draft.tap_ms; }
+    markDirty(); renderEditor();
+  });
+  $("#mActLong").hidden = act !== "long";
+  $("#mActMulti").hidden = act !== "multi";
+  $("#mLongSec").value = (draft.long_ms || 800) / 1000;
+  $("#mTaps").value = draft.taps || 2;
+  $("#mTapMs").value = draft.tap_ms || 350;
+  $("#mActHint").textContent = act === "long" ? "Kısa basıp bırakırsan tuş normal işini yapar."
+    : act === "multi" ? "İlk basışlar normal çalışır; makro son basışta çalışır."
+    : "Tuşa basar basmaz çalışır.";
   $("#mInterval").value = draft.interval_ms || 50;
   $("#mRepeat").value = draft.repeat || 1;
   $("#fInterval").hidden = draft.mode === "press" && (draft.repeat || 1) <= 1;
@@ -920,6 +987,9 @@ function updateRate() {
 $("#mName").oninput = e => { draft.name = e.target.value; markDirty(); };
 $("#mEnabled").onchange = e => { snapshot(); draft.enabled = e.target.checked; markDirty(); };
 $("#mTrigger").onchange = e => { snapshot(); draft.trigger = normTrig(e.target.value) || e.target.value.trim(); markDirty(); renderEditor(); };
+$("#mLongSec").oninput = e => { const v = parseFloat(String(e.target.value).replace(",", ".")); if (v > 0) { draft.long_ms = Math.round(v * 1000); markDirty(); } };
+$("#mTaps").oninput = e => { draft.taps = Math.min(10, Math.max(2, +e.target.value || 2)); markDirty(); };
+$("#mTapMs").oninput = e => { draft.tap_ms = Math.max(100, +e.target.value || 350); markDirty(); };
 $("#mInterval").oninput = e => { draft.interval_ms = +e.target.value; updateRate(); markDirty(); };
 $("#mRepeat").oninput = e => { draft.repeat = +e.target.value; $("#fInterval").hidden = (+e.target.value || 1) <= 1; markDirty(); };
 $("#mPass").onchange = e => { snapshot(); draft.passthrough = e.target.checked; markDirty(); };
@@ -1221,9 +1291,9 @@ function autoName(t) {
   if (t.startsWith("mx:")) return (ctlName(t) || "MX tuşu") + " makrosu";
   return t.split("+").map(keyLabel).join("+") + " makrosu";
 }
-function newMacro(kind, trigger = "") {
+function newMacro(kind, trigger = "", extra = {}) {
   const tpl = TEMPLATES[kind]();
-  const m = { id: uid(), enabled: true, app: profile, passthrough: false, repeat: 1, trigger, ...tpl };
+  const m = { id: uid(), enabled: true, app: profile, passthrough: false, repeat: 1, trigger, ...extra, ...tpl };
   if (!m.name) m.name = autoName(trigger);
   // not added to cfg.macros until saved
   if (view !== "editor") backView = view;
@@ -1311,7 +1381,7 @@ $("#importFile").onchange = async e => {
   if (!list.length) { toast("Dosyada makro yok", true); return; }
   let clash = 0;
   for (const m of list) {
-    if (m.enabled && cfg.macros.some(o => o.enabled && ieq(o.app, m.app) && normTrig(o.trigger) === normTrig(m.trigger))) { m.enabled = false; clash++; }
+    if (m.enabled && cfg.macros.some(o => o.enabled && ieq(o.app, m.app) && sameAct(o, m) && normTrig(o.trigger) === normTrig(m.trigger))) { m.enabled = false; clash++; }
   }
   cfg.macros.push(...list);
   if (await saveCfg(`${list.length} makro içe aktarıldı${clash ? ` (${clash} tanesi tetikleyici çakıştığı için kapalı)` : ""}`)) renderMacroList();

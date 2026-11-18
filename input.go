@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -313,7 +314,8 @@ func modBit(vk uint16) int {
 	return 0
 }
 
-func comboString(mods int, vk uint16) string {
+// modNames lists the held modifiers in canonical order: ctrl, alt, shift, win.
+func modNames(mods int) []string {
 	var parts []string
 	if mods&modCtrl != 0 {
 		parts = append(parts, "ctrl")
@@ -327,7 +329,26 @@ func comboString(mods int, vk uint16) string {
 	if mods&modWin != 0 {
 		parts = append(parts, "win")
 	}
-	return strings.Join(append(parts, vkName(vk)), "+")
+	return parts
+}
+
+func comboString(mods int, vk uint16) string {
+	return strings.Join(append(modNames(mods), vkName(vk)), "+")
+}
+
+// comboStringMulti is comboString for several non-modifier keys (a chord such
+// as "ctrl+a+s"); the keys are sorted by name so the order of pressing does not matter.
+func comboStringMulti(mods int, vks []uint16) string {
+	names := make([]string, 0, len(vks))
+	seen := map[string]bool{}
+	for _, v := range vks {
+		if n := vkName(v); !seen[n] {
+			seen[n] = true
+			names = append(names, n)
+		}
+	}
+	sort.Strings(names)
+	return strings.Join(append(modNames(mods), names...), "+")
 }
 
 // normalizeTrigger returns the canonical form of a trigger string:
@@ -355,7 +376,7 @@ func normalizeTrigger(t string) string {
 		return "middle"
 	}
 	mods := 0
-	var main uint16
+	var mains []uint16
 	for _, part := range strings.Split(strings.ReplaceAll(t, " ", ""), "+") {
 		vk, ok := parseKey(part)
 		if !ok {
@@ -364,11 +385,14 @@ func normalizeTrigger(t string) string {
 		if b := modBit(vk); b != 0 {
 			mods |= b
 		} else {
-			main = vk
+			mains = append(mains, vk)
 		}
 	}
-	if main == 0 {
+	switch len(mains) {
+	case 0:
 		return ""
+	case 1:
+		return comboString(mods, mains[0])
 	}
-	return comboString(mods, main)
+	return comboStringMulti(mods, mains)
 }

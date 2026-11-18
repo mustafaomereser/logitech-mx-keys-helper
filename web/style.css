@@ -308,6 +308,19 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; c
 .search:focus-within { border-color: var(--accent); }
 .search input { height: 32px !important; border: none !important; background: transparent !important; padding: 0 !important; box-shadow: none !important; }
 
+.chip.act { background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); color: var(--muted); }
+.act-param { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+.act-param .num { width: 76px !important; }
+.kp-addkey { margin: -6px 0 14px -8px; }
+.kp-addkey.active { color: var(--accent); background: var(--accent-soft); }
+.kp-act { display: block; font-size: 11.5px; color: var(--accent); font-weight: 500; margin-bottom: 2px; }
+.kp-when { margin-top: 6px; }
+.kp-actseg { margin-bottom: 4px; }
+.kp-param { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--faint); margin: 8px 0 4px; }
+.kp-param input { width: 70px !important; height: 30px !important; }
+.kp-note { font-size: 12.5px; color: var(--faint); margin-top: 10px; }
+.key-panel .kp-macro { margin-bottom: 10px; }
+
 /* library view */
 .list-card { padding: 0; }
 .list-toolbar { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); }

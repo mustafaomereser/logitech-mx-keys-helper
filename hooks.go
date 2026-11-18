@@ -62,9 +62,9 @@ var (
 	consumedBtn = map[string]consumed{}
 )
 
+// consumed remembers what a key/button down started, so its up goes to the same trigger.
 type consumed struct {
-	m        Macro
-	handled  bool
+	trigger  string // "" = eaten by trigger capture
 	suppress bool
 }
 
@@ -151,17 +151,20 @@ func handleKey(vk uint16, down bool) bool {
 		}
 		physDown[vk] = true
 		trig := comboString(physMods, vk)
+		// several normal keys held together (e.g. q+e): prefer that chord if something uses it
+		if chord := chordTrigger(); chord != "" && engine.has(chord) {
+			trig = chord
+		}
 		if capturer.offer(trig) {
-			consumedKey[vk] = consumed{handled: true, suppress: true}
+			consumedKey[vk] = consumed{suppress: true}
 			return true
 		}
 		if !engine.has(trig) {
 			return false
 		}
-		m, handled, suppress := engine.down(trig)
-		if handled {
-			consumedKey[vk] = consumed{m: m, handled: true, suppress: suppress}
-		}
+		v := vk
+		suppress := engine.press(trig, func() { sendKeys([]uint16{v}) })
+		consumedKey[vk] = consumed{trigger: trig, suppress: suppress}
 		return suppress
 	}
 	delete(physDown, vk)
@@ -170,10 +173,25 @@ func handleKey(vk uint16, down bool) bool {
 		return false
 	}
 	delete(consumedKey, vk)
-	if c.handled && c.m.ID != "" {
-		engine.up(c.m)
+	if c.trigger == "" {
+		return c.suppress
 	}
-	return c.suppress
+	return engine.release(c.trigger)
+}
+
+// chordTrigger is the trigger for all non-modifier keys held right now, or ""
+// when fewer than two are held.
+func chordTrigger() string {
+	var mains []uint16
+	for v := range physDown {
+		if modBit(v) == 0 {
+			mains = append(mains, v)
+		}
+	}
+	if len(mains) < 2 {
+		return ""
+	}
+	return comboStringMulti(physMods, mains)
 }
 
 func msHookProc(code uintptr, wparam uintptr, lparam uintptr) uintptr {
@@ -222,16 +240,15 @@ func handleMouse(msg uint32, data uint32) bool {
 	}
 	if down {
 		if capturer.offer(btn) {
-			consumedBtn[btn] = consumed{handled: true, suppress: true}
+			consumedBtn[btn] = consumed{suppress: true}
 			return true
 		}
 		if !engine.has(btn) {
 			return false
 		}
-		m, handled, suppress := engine.down(btn)
-		if handled {
-			consumedBtn[btn] = consumed{m: m, handled: true, suppress: suppress}
-		}
+		b := btn
+		suppress := engine.press(btn, func() { mouseDown(b); mouseUp(b) })
+		consumedBtn[btn] = consumed{trigger: btn, suppress: suppress}
 		return suppress
 	}
 	c, ok := consumedBtn[btn]
@@ -239,10 +256,10 @@ func handleMouse(msg uint32, data uint32) bool {
 		return false
 	}
 	delete(consumedBtn, btn)
-	if c.handled && c.m.ID != "" {
-		engine.up(c.m)
+	if c.trigger == "" {
+		return c.suppress
 	}
-	return c.suppress
+	return engine.release(c.trigger)
 }
 
 // ---------- trigger capture (GUI "Yakala" button) ----------

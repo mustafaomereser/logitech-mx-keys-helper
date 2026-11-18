@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## v0.3.2
+- **Çok tuşlu kombinasyonlar:** Birden fazla normal tuşa birlikte basmak tetikleyici olabiliyor (ör. `Q+E`, `Ctrl+A+S`); basma sırası önemsiz. Klavye panelindeki "Tuş ekle" ile kurulur.
+- **Ne zaman çalışsın:** Her makro için *Basınca*, *Basılı tutunca* (ör. 3 sn) ya da *Art arda basınca* (ör. 3 kez, aralarında en fazla 350 ms) seçilebiliyor. Aynı tuşa her biri için ayrı makro bağlanabilir.
+  - Basılı tutma ayarlı tuşa kısa basıp bırakırsan tuş normal işini yapar.
+  - Art arda basmada ilk basışlar normal çalışır, makro son basışta çalışır.
+
 ## v0.3.1
 - Atamalar baştan düzenlendi:
   - **Klavye** görünümü: tuşa tıklayınca sağdaki panelde ne yaptığı görünür (düzenle, dene, aç/kapa, atamayı kaldır). Boş tuşa tek tıkla kısayol, metin, program, medya tuşu ya da turbo atanır; var olan bir makro bağlanabilir.

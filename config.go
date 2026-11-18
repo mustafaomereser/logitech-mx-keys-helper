@@ -68,6 +68,15 @@ type Macro struct {
 	App         string   `json:"app,omitempty"`
 	Passthrough bool     `json:"passthrough,omitempty"`
 	Actions     []Action `json:"actions"`
+
+	// When the trigger counts as pressed:
+	//	""    = on key down
+	//	long  = after holding it for long_ms (released earlier: the key does its normal job)
+	//	multi = on the taps-th press, each within tap_ms of the previous one
+	Activation string `json:"activation,omitempty"`
+	LongMs     int    `json:"long_ms,omitempty"`
+	Taps       int    `json:"taps,omitempty"`
+	TapMs      int    `json:"tap_ms,omitempty"`
 }
 
 // legacy v1 format: "macros": { "0x0108": [ { "app": "", "actions": [...] } ] }
