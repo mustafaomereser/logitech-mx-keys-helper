@@ -1,5 +1,9 @@
 # Değişiklikler
 
+## v0.3.5
+- **Düzeltme: onarım Bluetooth'u kapatıp açamıyordu.** Intel Wireless Bluetooth adaptöründe eski yöntem "desteklenmiyor" hatası veriyordu. Bluetooth artık Windows'un hızlı ayarlardaki düğmesinin kullandığı yolla kapatılıp açılıyor; olmazsa yedek olarak `pnputil` ile aygıt kapatılıp açılıyor.
+- Seviye 1'de klavye düğümü yeniden başlatılamazsa (Windows "yeniden başlatma bekleniyor" derse) onarım boşa bitmiyor, aynı adımda Bluetooth kapatılıp açılıyor.
+
 ## v0.3.4
 - **Düzeltme: tuş yakalama ve makrolar arayüz açıldıktan sonra çalışmıyordu.** Klavye ve fare kancaları arayüz penceresiyle aynı iş parçacığındaydı; pencere bir saniyeden uzun meşgul kalınca Windows kancayı sessizce kaldırıyordu. Kancalar artık kendi iş parçacığında.
 - **Düzeltme: Mute ×3 çalışmıyordu.** Windows medya tuşlarını çoğu zaman cihaz bilgisi olmadan iletiyor; bu basışlar artık hareket için sayılıyor.

@@ -35,13 +35,42 @@ var repairer = &repairState{}
 func psScript(level int, pid string, logPath string) string {
 	p := strings.ToUpper(pid)
 	findHogp := fmt.Sprintf(`$hogp = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like 'BTHLEDEVICE\{00001812-*' -and $_.InstanceId -like '*PID&%s*' }`, p)
-	restartHogp := `foreach($d in $hogp){ "HOGP yeniden başlatılıyor: $($d.InstanceId)"; pnputil /restart-device "$($d.InstanceId)" }
+	// pnputil exits non-zero when the node refuses (e.g. "pending system reboot")
+	restartHogp := `$hogpOK = $false
+foreach($d in $hogp){ "HOGP yeniden başlatılıyor: $($d.InstanceId)"; pnputil /restart-device "$($d.InstanceId)"; if($LASTEXITCODE -eq 0){ $hogpOK = $true } }
 if(-not $hogp){ "HOGP düğümü bulunamadı" }`
 	findRadio := `$radio = Get-PnpDevice -Class Bluetooth -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like 'USB\VID_*' -or $_.InstanceId -like 'PCI\*' }
 if(-not $radio){ $radio = Get-PnpDevice -Class Bluetooth -PresentOnly | Where-Object { $_.FriendlyName -match 'Wireless Bluetooth|Bluetooth.*(Adapter|Radio)|Realtek|MediaTek|Qualcomm|Broadcom' } }`
-	cycleRadio := `foreach($r in $radio){ "Adaptör kapatılıyor: $($r.FriendlyName)"; Disable-PnpDevice -InstanceId $r.InstanceId -Confirm:$false }
-Start-Sleep -Seconds 3
-foreach($r in $radio){ "Adaptör açılıyor: $($r.FriendlyName)"; Enable-PnpDevice -InstanceId $r.InstanceId -Confirm:$false }`
+	// Turn Bluetooth off and on like the quick-settings switch (WinRT Radios API).
+	// Disable-PnpDevice is "Not supported" on some adapters (Intel Wireless Bluetooth),
+	// so the device-level cycle via pnputil is only the fallback.
+	cycleRadio := `$radioDone = $false
+try {
+  Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation` + "`" + `1' })[0]
+  function Wait-Rt($op, [Type]$t) { $task = $asTask.MakeGenericMethod($t).Invoke($null, @($op)); $task.Wait(-1) | Out-Null; $task.Result }
+  [Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=WindowsRuntime] | Out-Null
+  [Windows.Devices.Radios.RadioAccessStatus,Windows.System.Devices,ContentType=WindowsRuntime] | Out-Null
+  [Windows.Devices.Radios.RadioState,Windows.System.Devices,ContentType=WindowsRuntime] | Out-Null
+  Wait-Rt ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus]) | Out-Null
+  $radios = Wait-Rt ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
+  $bt = $radios | Where-Object { $_.Kind -eq 'Bluetooth' }
+  foreach($b in $bt){
+    "Bluetooth kapatılıyor: $($b.Name)"
+    $r1 = Wait-Rt ($b.SetStateAsync([Windows.Devices.Radios.RadioState]::Off)) ([Windows.Devices.Radios.RadioAccessStatus])
+    Start-Sleep -Seconds 3
+    "Bluetooth açılıyor: $($b.Name)"
+    $r2 = Wait-Rt ($b.SetStateAsync([Windows.Devices.Radios.RadioState]::On)) ([Windows.Devices.Radios.RadioAccessStatus])
+    "sonuç: $r1 / $r2"
+    if("$r1" -eq 'Allowed' -and "$r2" -eq 'Allowed'){ $radioDone = $true }
+  }
+  if(-not $bt){ "Bluetooth radyosu bulunamadı (WinRT)" }
+} catch { "WinRT radyo hatası: $_" }
+if(-not $radioDone){
+  foreach($r in $radio){ "Adaptör kapatılıyor (pnputil): $($r.FriendlyName)"; pnputil /disable-device "$($r.InstanceId)" }
+  Start-Sleep -Seconds 3
+  foreach($r in $radio){ "Adaptör açılıyor (pnputil): $($r.FriendlyName)"; pnputil /enable-device "$($r.InstanceId)" }
+}`
 
 	var body string
 	switch level {
