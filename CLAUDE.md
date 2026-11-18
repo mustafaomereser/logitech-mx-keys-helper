@@ -21,7 +21,7 @@ A Windows tray helper for the Logitech MX Keys Mini (Bluetooth LE). Go, standard
 
 MX Keys Mini on Bluetooth with an Intel Wireless Bluetooth adapter, Windows 11, laptop. After the keyboard sleeps and reconnects, only the volume/media keys work. Resetting the keyboard or disabling and re-enabling the HID devices in Device Manager does not fix it; only a reboot does. The laptop's own keyboard keeps working. Logi Options+ and G HUB are installed; G HUB adds a virtual keyboard.
 
-Working hypothesis: on reconnect, Windows fails to re-subscribe to the GATT notifications for the HOGP keyboard input report, while the consumer-control report still arrives.
+**Root cause found (2026-11-19):** the Interception filter driver (Oblita, `keyboard.sys` / `mouse.sys` as keyboard/mouse class UpperFilters) was installed. It has a fixed number of device slots and frees them only on reboot; every Bluetooth reconnect is a new device stack, so after enough wake-ups the MX keyboard's input went nowhere. A raw-input count while stuck showed zero events from the MX device; the "working" media keys were injected by Logi Options+ from its HID++ channel. The user removed the filters (UpperFilters back to `kbdclass` / `mouclass`) and rebooted. The repair ladder cannot help against this; if the hang comes back, check the class UpperFilters first.
 
 ## Architecture (files)
 
