@@ -138,7 +138,16 @@ func handleRawInput(lparam uintptr) {
 		return
 	}
 	hdr := (*rawInputHeader)(unsafe.Pointer(&buf[0]))
-	if hdr.Device == 0 { // injected (SendInput) – ignore
+	if hdr.Device == 0 {
+		// injected input. Media keys often arrive this way: the HID service (or
+		// Logitech's software) turns consumer reports into VK_VOLUME_MUTE without a
+		// device handle. Count those for the Mute x3 gesture only.
+		if hdr.Type == rimTypeKeyboard && len(buf) >= int(hdrSize+unsafe.Sizeof(rawKeyboard{})) {
+			kb := (*rawKeyboard)(unsafe.Pointer(&buf[hdrSize]))
+			if kb.VKey == vkVolumeMute && kb.Flags&riKeyBreak == 0 {
+				detector.onMuteGesture()
+			}
+		}
 		return
 	}
 	if !isMXDevice(rawDeviceName(hdr.Device)) {
@@ -196,6 +205,44 @@ func handleRawInput(lparam uintptr) {
 	}
 }
 
+// onMuteGesture counts a mute press that came without a device handle.
+func (d *stuckDetector) onMuteGesture() {
+	d.mu.Lock()
+	if !d.muteLocked(time.Now()) {
+		d.mu.Unlock()
+	}
+}
+
+// muteLocked records a mute press for the gesture (Mute x3 within 2.5 s => repair right
+// away). When it fires it unlocks d.mu and returns true. One press may be seen through
+// two paths (device + injected), so presses closer than 120 ms count once.
+func (d *stuckDetector) muteLocked(now time.Time) bool {
+	if n := len(d.muteTimes); n > 0 && now.Sub(d.muteTimes[n-1]) < 120*time.Millisecond {
+		return false
+	}
+	if now.Sub(d.muteUndo) < 400*time.Millisecond { // our own "undo" mute below
+		return false
+	}
+	var keep []time.Time
+	for _, t := range append(d.muteTimes, now) {
+		if now.Sub(t) < 2500*time.Millisecond {
+			keep = append(keep, t)
+		}
+	}
+	d.muteTimes = keep
+	if len(keep) < 3 {
+		return false
+	}
+	d.muteTimes = nil
+	d.repairPending = true
+	d.muteUndo = now
+	d.mu.Unlock()
+	logf("Mute x3 algılandı")
+	sendKeys([]uint16{vkVolumeMute}) // three mutes toggled the sound; undo it
+	go repairer.repair("Mute x3")
+	return true
+}
+
 // ---------- stuck-keyboard detector ----------
 //
 // Failure signature: after the keyboard wakes/reconnects, only media (consumer) keys
@@ -209,6 +256,7 @@ type stuckDetector struct {
 	mediaSince    int
 	lastMedia     time.Time
 	muteTimes     []time.Time
+	muteUndo      time.Time
 	lastPrompt    time.Time
 	repairPending bool
 }
@@ -260,24 +308,8 @@ func (d *stuckDetector) onMediaKey(isMute bool) {
 	d.touchLocked(now)
 	d.mediaSince++
 
-	// gesture: Mute x3 within 2.5 s => repair right away
-	if isMute {
-		d.muteTimes = append(d.muteTimes, now)
-		var keep []time.Time
-		for _, t := range d.muteTimes {
-			if now.Sub(t) < 2500*time.Millisecond {
-				keep = append(keep, t)
-			}
-		}
-		d.muteTimes = keep
-		if len(keep) >= 3 {
-			d.muteTimes = nil
-			d.repairPending = true
-			d.mu.Unlock()
-			sendKeys([]uint16{vkVolumeMute}) // undo the odd toggle
-			go repairer.repair("Mute x3")
-			return
-		}
+	if isMute && d.muteLocked(now) {
+		return
 	}
 
 	c := getConfig()

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -68,13 +69,50 @@ type consumed struct {
 	suppress bool
 }
 
+var (
+	pGetCurrentThreadId = kernel32.NewProc("GetCurrentThreadId")
+	pPostThreadMessageW = user32.NewProc("PostThreadMessageW")
+	pPeekMessageW       = user32.NewProc("PeekMessageW")
+	hookTid             atomic.Uint32
+)
+
+// startHookThread runs the low-level hooks on their own thread with its own message
+// loop. Windows silently removes a low-level hook whose thread does not answer within
+// LowLevelHooksTimeout (about a second); on the UI thread that happened whenever the
+// GUI (WebView2) kept it busy, after which captures and macros stopped working.
+func startHookThread() {
+	ready := make(chan struct{})
+	go func() {
+		runtime.LockOSThread()
+		var m msgT
+		pPeekMessageW.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0, 0) // create the thread's message queue
+		tid, _, _ := pGetCurrentThreadId.Call()
+		hookTid.Store(uint32(tid))
+		close(ready)
+		updateHooks()
+		for {
+			r, _, _ := pGetMessageW.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
+			if int32(r) <= 0 {
+				return
+			}
+			if m.Hwnd == 0 && m.Message == wmHookUpdate {
+				updateHooks()
+				continue
+			}
+			pTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
+			pDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
+		}
+	}()
+	<-ready
+}
+
 func requestHookUpdate() {
-	if trayHwnd != 0 {
-		pPostMessageW.Call(trayHwnd, wmHookUpdate, 0, 0)
+	if tid := hookTid.Load(); tid != 0 {
+		pPostThreadMessageW.Call(uintptr(tid), wmHookUpdate, 0, 0)
 	}
 }
 
-// updateHooks installs/removes the low-level hooks as needed. UI thread only.
+// updateHooks installs/removes the low-level hooks as needed. Hook thread only.
 func updateHooks() {
 	kb, ms := engine.hookNeeds()
 	if capturer.active() || recorder.active() {
@@ -214,7 +252,29 @@ func msHookProc(code uintptr, wparam uintptr, lparam uintptr) uintptr {
 	return r
 }
 
+const (
+	wmMouseWheel  = 0x020A
+	wmMouseHWheel = 0x020E
+)
+
+// mouseTrigger: the held modifiers and keys plus the mouse part, e.g. "ctrl+q+mouse5".
+func mouseTrigger(part string) string {
+	var mains []uint16
+	for v := range physDown {
+		if modBit(v) == 0 {
+			mains = append(mains, v)
+		}
+	}
+	if physMods == 0 && len(mains) == 0 {
+		return part
+	}
+	return comboStringMulti(physMods, mains) + "+" + part
+}
+
 func handleMouse(msg uint32, data uint32) bool {
+	if msg == wmMouseWheel || msg == wmMouseHWheel {
+		return handleWheel(msg, int16(data>>16))
+	}
 	var btn string
 	var down bool
 	switch msg {
@@ -235,20 +295,29 @@ func handleMouse(msg uint32, data uint32) bool {
 		return false
 	}
 	recorder.button(btn, down)
-	if btn == "left" || btn == "right" { // never usable as triggers
-		return false
+	part := map[string]string{"left": "mouseleft", "right": "mouseright"}[btn]
+	if part == "" {
+		part = btn
 	}
 	if down {
-		if capturer.offer(btn) {
+		trig := mouseTrigger(part)
+		bare := trig == part
+		if bare && !mouseAlone(part) { // plain left/right click: never a trigger, never captured
+			return false
+		}
+		if capturer.offer(trig) {
 			consumedBtn[btn] = consumed{suppress: true}
 			return true
 		}
-		if !engine.has(btn) {
-			return false
+		if !engine.has(trig) {
+			if bare || !mouseAlone(part) || !engine.has(part) {
+				return false
+			}
+			trig = part // e.g. shift held while using a "mouse4" macro
 		}
 		b := btn
-		suppress := engine.press(btn, func() { mouseDown(b); mouseUp(b) })
-		consumedBtn[btn] = consumed{trigger: btn, suppress: suppress}
+		suppress := engine.press(trig, func() { mouseDown(b); mouseUp(b) })
+		consumedBtn[btn] = consumed{trigger: trig, suppress: suppress}
 		return suppress
 	}
 	c, ok := consumedBtn[btn]
@@ -260,6 +329,32 @@ func handleMouse(msg uint32, data uint32) bool {
 		return c.suppress
 	}
 	return engine.release(c.trigger)
+}
+
+// handleWheel: a wheel notch with a key held fires like a quick press and release.
+func handleWheel(msg uint32, delta int16) bool {
+	if delta == 0 || (physMods == 0 && len(physDown) == 0) {
+		return false
+	}
+	part := "wheelup"
+	switch {
+	case msg == wmMouseWheel && delta < 0:
+		part = "wheeldown"
+	case msg == wmMouseHWheel && delta > 0:
+		part = "wheelright"
+	case msg == wmMouseHWheel:
+		part = "wheelleft"
+	}
+	trig := mouseTrigger(part)
+	if capturer.offer(trig) {
+		return true
+	}
+	if !engine.has(trig) {
+		return false
+	}
+	suppress := engine.press(trig, nil)
+	engine.release(trig)
+	return suppress
 }
 
 // ---------- trigger capture (GUI "Yakala" button) ----------

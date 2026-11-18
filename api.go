@@ -50,7 +50,13 @@ func startGUIServer() error {
 	files := http.FileServer(http.FS(static))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("t"); t != "" && subtle.ConstantTimeCompare([]byte(t), []byte(guiToken)) == 1 {
-			http.SetCookie(w, &http.Cookie{Name: "mxh", Value: guiToken, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+			http.SetCookie(w, &http.Cookie{Name: cookieName("mxh"), Value: guiToken, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+			// mxw=1 tells the page it runs in our own window and must draw the title bar
+			win := &http.Cookie{Name: cookieName("mxw"), Value: "1", Path: "/", SameSite: http.SameSiteStrictMode}
+			if r.URL.Query().Get("w") != "1" {
+				win.Value, win.MaxAge = "", -1
+			}
+			http.SetCookie(w, win)
 			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
@@ -221,6 +227,22 @@ func startGUIServer() error {
 		openReleasePage()
 		writeJSON(w, map[string]any{"ok": true})
 	})
+	api("GET /api/window", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]bool{"max": guiMaximized()})
+	})
+	api("POST /api/window", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Cmd, Hit string }
+		json.NewDecoder(r.Body).Decode(&req)
+		hits := map[string]uintptr{"caption": 2, "top": 12, "topleft": 13, "topright": 14}
+		cmds := map[string]uintptr{"min": guiCmdMin, "max": guiCmdMax, "close": guiCmdClose}
+		ok := false
+		if req.Cmd == "drag" && hits[req.Hit] != 0 {
+			ok = postGUICmd(guiCmdDrag, hits[req.Hit])
+		} else if cmds[req.Cmd] != 0 {
+			ok = postGUICmd(cmds[req.Cmd], 0)
+		}
+		writeJSON(w, map[string]bool{"ok": ok})
+	})
 	api("POST /api/gamemode", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			On bool `json:"on"`
@@ -290,8 +312,15 @@ func hostCheck(h http.Handler) http.Handler {
 	})
 }
 
+// cookieName is per port: cookies ignore ports, so without this another MX Helper
+// instance on 127.0.0.1 (an update, a second copy) would overwrite our session.
+func cookieName(base string) string {
+	_, port, _ := strings.Cut(guiAddr, ":")
+	return base + "_" + port
+}
+
 func authed(r *http.Request) bool {
-	if c, err := r.Cookie("mxh"); err == nil && subtle.ConstantTimeCompare([]byte(c.Value), []byte(guiToken)) == 1 {
+	if c, err := r.Cookie(cookieName("mxh")); err == nil && subtle.ConstantTimeCompare([]byte(c.Value), []byte(guiToken)) == 1 {
 		return true
 	}
 	return false

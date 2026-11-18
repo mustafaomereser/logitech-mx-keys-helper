@@ -359,12 +359,15 @@ type controlInfo struct {
 
 func (c controlInfo) Divertable() bool { return c.Flags&0x20 != 0 }
 
+// Names of ReprogControlsV4 CIDs. The MX Keys Mini ones (F4–F12, vol+) were confirmed
+// against a real keyboard's diagnostics and its keycaps.
 var cidNames = map[uint16]string{
 	0x00C3: "Gesture", 0x00C7: "Brightness Down", 0x00C8: "Brightness Up", 0x00D4: "Show Desktop",
 	0x00D7: "Switch App", 0x00D1: "Easy-Switch 1", 0x00D2: "Easy-Switch 2", 0x00D3: "Easy-Switch 3",
-	0x00E0: "Mission Control/Task View", 0x00E3: "Show Desktop", 0x00E4: "Lock", 0x00E6: "Calculator",
-	0x0103: "Dictation?", 0x0108: "Emoji?", 0x010A: "Screen Capture?", 0x011C: "Mic Mute?",
-	0x0110: "Backlight Up?", 0x0111: "Backlight Down?", 0x00E7: "Screen Lock", 0x011E: "Do Not Disturb?",
+	0x00E0: "Mission Control/Task View", 0x00E2: "Işık azalt", 0x00E3: "Işık artır", 0x00E4: "Lock",
+	0x00E5: "Oynat / duraklat", 0x00E6: "Calculator", 0x00E7: "Sessiz", 0x00E8: "Ses azalt", 0x00E9: "Ses artır",
+	0x0103: "Dikte", 0x0108: "Emoji", 0x010A: "Ekran görüntüsü", 0x011C: "Mikrofon kapat",
+	0x0110: "Backlight Up?", 0x0111: "Backlight Down?", 0x011E: "Do Not Disturb?",
 }
 
 func cidName(c uint16) string {

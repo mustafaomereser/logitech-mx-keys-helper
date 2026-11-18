@@ -367,17 +367,17 @@ func normalizeTrigger(t string) string {
 		}
 		return fmt.Sprintf("mx:0x%04x", n)
 	}
-	switch t {
-	case "mouse4", "x1", "xbutton1":
-		return "mouse4"
-	case "mouse5", "x2", "xbutton2":
-		return "mouse5"
-	case "middle", "mouse3", "mbutton":
-		return "middle"
-	}
 	mods := 0
 	var mains []uint16
+	mouse := ""
 	for _, part := range strings.Split(strings.ReplaceAll(t, " ", ""), "+") {
+		if mb := mouseTrigName(part); mb != "" {
+			if mouse != "" && mouse != mb {
+				return "" // one mouse button per trigger
+			}
+			mouse = mb
+			continue
+		}
 		vk, ok := parseKey(part)
 		if !ok {
 			return ""
@@ -388,6 +388,16 @@ func normalizeTrigger(t string) string {
 			mains = append(mains, vk)
 		}
 	}
+	if mouse != "" {
+		// left/right click and the wheel only together with a key, so the mouse keeps working
+		if mods == 0 && len(mains) == 0 && !mouseAlone(mouse) {
+			return ""
+		}
+		if mods == 0 && len(mains) == 0 {
+			return mouse
+		}
+		return comboStringMulti(mods, mains) + "+" + mouse
+	}
 	switch len(mains) {
 	case 0:
 		return ""
@@ -395,4 +405,26 @@ func normalizeTrigger(t string) string {
 		return comboString(mods, mains[0])
 	}
 	return comboStringMulti(mods, mains)
+}
+
+// Mouse parts of a trigger. They always come last: "ctrl+mouseleft", "q+mouse5".
+var mouseAliases = map[string]string{
+	"mouseleft": "mouseleft", "lbutton": "mouseleft", "mouse1": "mouseleft",
+	"mouseright": "mouseright", "rbutton": "mouseright", "mouse2": "mouseright",
+	"middle": "middle", "mouse3": "middle", "mbutton": "middle",
+	"mouse4": "mouse4", "x1": "mouse4", "xbutton1": "mouse4",
+	"mouse5": "mouse5", "x2": "mouse5", "xbutton2": "mouse5",
+	"wheelup": "wheelup", "wheeldown": "wheeldown", "wheelleft": "wheelleft", "wheelright": "wheelright",
+}
+
+func mouseTrigName(part string) string { return mouseAliases[part] }
+
+func mouseAlone(m string) bool { return m == "middle" || m == "mouse4" || m == "mouse5" }
+
+// triggerMouse returns the mouse part of a normalized trigger, or "".
+func triggerMouse(t string) string {
+	if i := strings.LastIndexByte(t, '+'); i >= 0 {
+		t = t[i+1:]
+	}
+	return mouseAliases[t]
 }

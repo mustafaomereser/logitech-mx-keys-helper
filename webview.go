@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -35,11 +36,17 @@ var (
 	pChangeWindowMsgFilterEx = user32.NewProc("ChangeWindowMessageFilterEx")
 	pAllowSetForegroundWin   = user32.NewProc("AllowSetForegroundWindow")
 	pUpdateWindow            = user32.NewProc("UpdateWindow")
+	pReleaseCapture          = user32.NewProc("ReleaseCapture")
+	pIsZoomed                = user32.NewProc("IsZoomed")
+	pGetAsyncKeyState        = user32.NewProc("GetAsyncKeyState")
 )
 
 const (
 	wmOpenGUI      = wmApp + 5
 	wmQuitApp      = wmApp + 6 // quit from another goroutine (self-update)
+	wmGuiCmd       = wmApp + 7 // window command from the page's own title bar (wparam = guiCmd*, lparam = hit-test code)
+	wmNcCalcSize   = 0x0083
+	wmNcLButtonDn  = 0x00A1
 	guiClassName   = "MXHelperGUI"
 	wmSize         = 0x0005
 	wmActivate     = 0x0006
@@ -50,6 +57,36 @@ const (
 	cwUseDefault   = 0x80000000
 	guiBG          = 0x00131111 // COLORREF (BGR) of #111113
 )
+
+// Commands from the custom title bar (POST /api/window).
+const (
+	guiCmdDrag = iota + 1 // start a system move/size loop; lparam = HTCAPTION / HTTOP...
+	guiCmdMin
+	guiCmdMax // toggle maximize
+	guiCmdClose
+)
+
+// guiHwndA mirrors gui.hwnd for other goroutines (HTTP handlers).
+var guiHwndA atomic.Uintptr
+
+// postGUICmd forwards a title-bar command to the UI thread. false when our window is not open.
+func postGUICmd(cmd, arg uintptr) bool {
+	h := guiHwndA.Load()
+	if h == 0 {
+		return false
+	}
+	pPostMessageW.Call(h, wmGuiCmd, cmd, arg)
+	return true
+}
+
+func guiMaximized() bool {
+	h := guiHwndA.Load()
+	if h == 0 {
+		return false
+	}
+	r, _, _ := pIsZoomed.Call(h)
+	return r != 0
+}
 
 // enableDPIAwareness: per-monitor v2, so the GUI and menus are sharp on scaled displays.
 func enableDPIAwareness() {
@@ -136,6 +173,13 @@ func comRelease(obj uintptr) {
 	}
 }
 
+type guid struct {
+	Data1 uint32
+	Data2 uint16
+	Data3 uint16
+	Data4 [8]byte
+}
+
 // handler is a minimal COM object: IUnknown + Invoke. WebView2 only calls these four slots.
 type handler struct{ vtbl *[4]uintptr }
 
@@ -214,7 +258,9 @@ func showGUIWindow() {
 		go openGUIOnce(guiURL())
 		return
 	}
-	gui.hwnd, gui.url = hwnd, guiURL()
+	gui.hwnd, gui.url = hwnd, guiURL()+"&w=1" // w=1: the page draws its own title bar
+	guiHwndA.Store(hwnd)
+	pSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0, 0x0027) // SWP_FRAMECHANGED|NOZORDER|NOSIZE|NOMOVE: apply wmNcCalcSize
 	one := uint32(1)
 	pDwmSetWindowAttribute.Call(hwnd, 20, uintptr(unsafe.Pointer(&one)), 4) // DWMWA_USE_IMMERSIVE_DARK_MODE
 	bg := uint32(guiBG)
@@ -276,6 +322,16 @@ func onControllerCreated(this, hr, ctrl uintptr) uintptr {
 			comCall(s, 10, 0) // put_IsStatusBarEnabled(false)
 			comCall(s, 12, 0) // put_AreDevToolsEnabled(false)
 			comCall(s, 18, 0) // put_IsZoomControlEnabled(false)
+			// ICoreWebView2Settings3: turn off browser shortcuts (F3/Ctrl+F find, F5 reload, Ctrl+P print...).
+			// Editing keys (copy, paste, undo) keep working.
+			iid := guid{0xfdb5ab74, 0xaf33, 0x4854, [8]byte{0x84, 0xf0, 0x0a, 0x63, 0x1d, 0xeb, 0x5e, 0xba}}
+			var s3 uintptr
+			if comCall(s, 0, uintptr(unsafe.Pointer(&iid)), uintptr(unsafe.Pointer(&s3))) == 0 && s3 != 0 {
+				comCall(s3, 24, 0) // put_AreBrowserAcceleratorKeysEnabled(false)
+				comRelease(s3)
+			} else {
+				logf("WebView2: tarayıcı kısayolları kapatılamadı (eski çalışma zamanı)")
+			}
 			comRelease(s)
 		}
 	}
@@ -306,6 +362,7 @@ func closeGUIWindow() {
 	comRelease(gui.env) // last reference: the browser processes exit
 	h := gui.hwnd
 	gui.view, gui.ctrl, gui.env, gui.hwnd = 0, 0, 0, 0
+	guiHwndA.Store(0)
 	if h != 0 {
 		pDestroyWindow.Call(h)
 	}
@@ -331,6 +388,41 @@ func guiWndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		return 0
 	case wmClose:
 		closeGUIWindow()
+		return 0
+	case wmNcCalcSize:
+		// Drop the system caption: the page draws its own title bar. The side and
+		// bottom resize borders stay (they are the invisible DWM frame on Windows 10/11).
+		if wparam == 0 {
+			break
+		}
+		rc := *(**[4]int32)(unsafe.Pointer(&lparam))
+		left, top := rc[0], rc[1]
+		pDefWindowProcW.Call(hwnd, msg, wparam, lparam)
+		rc[1] = top
+		if z, _, _ := pIsZoomed.Call(hwnd); z != 0 {
+			rc[1] = top + (rc[0] - left) // maximized windows hang over the screen edge by the frame width
+		}
+		return 0
+	case wmGuiCmd:
+		switch wparam {
+		case guiCmdDrag:
+			if s, _, _ := pGetAsyncKeyState.Call(0x01); s&0x8000 == 0 { // button already released: no loop
+				return 0
+			}
+			x, y := cursorPos()
+			pReleaseCapture.Call()
+			pPostMessageW.Call(hwnd, wmNcLButtonDn, lparam, uintptr(uint32(int16(x)))&0xFFFF|uintptr(uint16(int16(y)))<<16)
+		case guiCmdMin:
+			pShowWindow.Call(hwnd, 6) // SW_MINIMIZE
+		case guiCmdMax:
+			if z, _, _ := pIsZoomed.Call(hwnd); z != 0 {
+				pShowWindow.Call(hwnd, 9) // SW_RESTORE
+			} else {
+				pShowWindow.Call(hwnd, 3) // SW_MAXIMIZE
+			}
+		case guiCmdClose:
+			pPostMessageW.Call(hwnd, wmClose, 0, 0)
+		}
 		return 0
 	}
 	r, _, _ := pDefWindowProcW.Call(hwnd, msg, wparam, lparam)

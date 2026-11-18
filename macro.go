@@ -38,7 +38,7 @@ func (e *macroEngine) rebuild() {
 		by[t] = append(by[t], m)
 		switch {
 		case strings.HasPrefix(t, "mx:"):
-		case t == "mouse4" || t == "mouse5" || t == "middle":
+		case triggerMouse(t) != "":
 			needMouse = true
 		default:
 			needKB = true

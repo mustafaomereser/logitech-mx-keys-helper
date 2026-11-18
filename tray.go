@@ -500,7 +500,7 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		updateTray()
 		return 0
 	case wmHookUpdate:
-		updateHooks()
+		requestHookUpdate()
 		return 0
 	case wmOpenGUI:
 		showGUIWindow()
@@ -544,7 +544,7 @@ func runUI() {
 	iconOn = loadIcon(iconOnData, "icon_on.ico")
 	iconOff = loadIcon(iconOffData, "icon_off.ico")
 	trayAdd()
-	updateHooks()
+	startHookThread()
 	if err := registerRawInput(hwnd); err != nil {
 		logf("Raw input kaydı başarısız: %v", err)
 	}

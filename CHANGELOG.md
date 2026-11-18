@@ -1,5 +1,15 @@
 # Değişiklikler
 
+## v0.3.4
+- **Düzeltme: tuş yakalama ve makrolar arayüz açıldıktan sonra çalışmıyordu.** Klavye ve fare kancaları arayüz penceresiyle aynı iş parçacığındaydı; pencere bir saniyeden uzun meşgul kalınca Windows kancayı sessizce kaldırıyordu. Kancalar artık kendi iş parçacığında.
+- **Düzeltme: Mute ×3 çalışmıyordu.** Windows medya tuşlarını çoğu zaman cihaz bilgisi olmadan iletiyor; bu basışlar artık hareket için sayılıyor.
+- **Klavye ve fare birlikte:** tetikleyici artık tuş + fare tuşu olabilir: `Ctrl + sol tık`, `Q + fare ileri`, `Shift + tekerlek aşağı`. Fare çiziminde sol, sağ, tekerlek yukarı/aşağı da var. Sol/sağ tık ve tekerlek, fare normal çalışmaya devam etsin diye yalnızca bir tuşla birlikte atanabilir.
+- Uygulama penceresinin kendi başlık çubuğu: Windows başlığı yerine arayüze uyan çubuk; sürükleme, çift tıkla büyütme, kenarlardan boyutlandırma çalışır.
+- Tarayıcı davranışları kapatıldı: F3/Ctrl+F arama, F5 yenileme, Ctrl+P yazdırma, sağ tık menüsü, fare geri/ileri ile sayfa değişmesi gibi.
+- Klavye çizimi gerçek MX Keys Mini Türkçe Q düzenine göre yeniden çizildi: ISO Enter, `<` tuşu, alt sırada Ctrl · fn · Start · Alt, üst sırada tuş simgeleri ve `ins` (ses artır) tuşu, yarım yükseklikte ok tuşları.
+- MX özel tuş adları gerçek klavyeden doğrulandı (F4/F5 ışık, F10 oynat/duraklat, F11 sessiz, F12 ses azalt, ins ses artır).
+- Oturum çerezi porta özel: başka bir MX Helper örneği açık pencerenin oturumunu bozamaz. Bozulursa "bağlantı hatası" yerine ne yapılacağı yazar.
+
 ## v0.3.3
 - Genel bakıştaki klavye çiziminde MX Keys Mini'de bastığın tuşlar canlı olarak yanar (laptop klavyesi değil, sadece MX). Tuşlar fiziksel konumlarına göre eşlenir, Türkçe Q'da da doğru yanar. Sayfa açık değilken hiçbir şey dinlenmez.
 

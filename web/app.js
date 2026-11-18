@@ -32,6 +32,7 @@ async function api(method, path, body, raw) {
     opt.headers["Content-Type"] = raw ? "text/plain" : "application/json";
   }
   const r = await fetch(path, opt);
+  if (r.status === 403) throw new Error("Oturum geçersiz (MX Helper yeniden başlamış olabilir). Pencereyi kapatıp tepsideki simgeden yeniden aç.");
   const ct = r.headers.get("Content-Type") || "";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) throw new Error((data && data.error) || data || r.statusText);
@@ -123,7 +124,7 @@ async function pickApp(title) {
 const ALIAS = {
   control: "ctrl", lctrl: "ctrl", rctrl: "ctrl", lalt: "alt", ralt: "alt", altgr: "alt", lshift: "shift", rshift: "shift",
   lwin: "win", rwin: "win", return: "enter", escape: "esc", del: "delete", ins: "insert", pageup: "pgup", pagedown: "pgdn",
-  prtsc: "printscreen", apps: "menu", x1: "mouse4", xbutton1: "mouse4", x2: "mouse5", xbutton2: "mouse5", mouse3: "middle", mbutton: "middle",
+  prtsc: "printscreen", apps: "menu", x1: "mouse4", xbutton1: "mouse4", x2: "mouse5", xbutton2: "mouse5", mouse3: "middle", mbutton: "middle", lbutton: "mouseleft", rbutton: "mouseright", mouse1: "mouseleft", mouse2: "mouseright",
 };
 const MODS = ["ctrl", "alt", "shift", "win"];
 function normTrig(t) {
@@ -134,12 +135,21 @@ function normTrig(t) {
     return isNaN(n) ? "" : "mx:0x" + n.toString(16).padStart(4, "0");
   }
   const parts = t.split("+").filter(Boolean).map(p => ALIAS[p] || p);
-  if (parts.length === 1 && ["mouse4", "mouse5", "middle"].includes(parts[0])) return parts[0];
   const ms = MODS.filter(m => parts.includes(m));
   // several normal keys (a chord like q+e) are sorted, like the Go side does
-  const mains = [...new Set(parts.filter(p => !MODS.includes(p)))].sort();
+  const mains = [...new Set(parts.filter(p => !MODS.includes(p) && !MOUSE_TR[p]))].sort();
+  // a mouse button goes last: ctrl+mouseleft, q+mouse5. Left/right click and the wheel
+  // need a keyboard key with them, otherwise the mouse would stop working normally.
+  const mouse = [...new Set(parts.filter(p => MOUSE_TR[p]))];
+  if (mouse.length > 1) return "";
+  if (mouse.length) return !ms.length && !mains.length && !MOUSE_ALONE.includes(mouse[0]) ? "" : [...ms, ...mains, mouse[0]].join("+");
   return mains.length ? [...ms, ...mains].join("+") : "";
 }
+// trigger ends with a mouse button / wheel
+const hasMouse = t => { t = normTrig(t); return !!t && !!MOUSE_TR[t.split("+").pop()]; };
+const isKeyOnly = t => !!t && !t.startsWith("mx:") && !hasMouse(t);
+const MOUSE_TR = { mouseleft: "Sol tık", mouseright: "Sağ tık", middle: "Orta tık", mouse4: "Fare geri", mouse5: "Fare ileri", wheelup: "Tekerlek ↑", wheeldown: "Tekerlek ↓", wheelleft: "Tekerlek ←", wheelright: "Tekerlek →" };
+const MOUSE_ALONE = ["middle", "mouse4", "mouse5"];
 const trigMain = t => { t = normTrig(t); return t.startsWith("mx:") ? t : t.split("+").pop(); };
 const trigMains = t => { t = normTrig(t); return !t || t.startsWith("mx:") ? [] : t.split("+").filter(p => !MODS.includes(p)); };
 
@@ -165,7 +175,7 @@ function actFields(a) {
 const trigMods = t => normTrig(t).split("+").slice(0, -1);
 
 const KEYLABEL = { esc: "Esc", delete: "Del", backspace: "⌫", tab: "Tab", capslock: "Caps", enter: "Enter", space: "Boşluk", left: "←", right: "→", up: "↑", down: "↓", ctrl: "Ctrl", alt: "Alt", shift: "Shift", win: "Win", playpause: "⏯", next: "⏭", prev: "⏮", mute: "🔇", volup: "🔊", voldown: "🔉", pgup: "PgUp", pgdn: "PgDn", printscreen: "PrtSc", plus: "=", minus: "-", comma: ",", period: "." };
-const keyLabel = p => KEYLABEL[p] || (p.length === 1 ? p.toUpperCase() : p.replace(/^f(\d+)$/, "F$1"));
+const keyLabel = p => MOUSE_TR[p] || KEYLABEL[p] || (p.length === 1 ? p.toUpperCase() : p.replace(/^f(\d+)$/, "F$1"));
 
 function ctlName(cid) {
   const c = controls.find(x => x.cid === cid);
@@ -180,13 +190,16 @@ function triggerHTML(t) {
     const c = controls.find(x => x.cid === t);
     return `<kbd>MX</kbd> ${n ? esc(n) : `<span class="mono">${esc(t.slice(3))}</span>`}${c && c.pos ? ` <span class="muted small">(F${c.pos})</span>` : ""}`;
   }
-  const mouse = { mouse4: "Fare geri (yan 4)", mouse5: "Fare ileri (yan 5)", middle: "Fare orta tuş" };
-  if (mouse[t]) return `${icon("i-mouse", "sm")} ${mouse[t]}`;
-  return t.split("+").map(p => `<kbd>${esc(keyLabel(p))}</kbd>`).join('<span class="plus">+</span>');
+  return t.split("+").map(p => MOUSE_TR[p] ? `<kbd class="mk">${icon("i-mouse", "sm")}${esc(MOUSE_TR[p])}</kbd>` : `<kbd>${esc(keyLabel(p))}</kbd>`).join('<span class="plus">+</span>');
 }
 
 // ---------- keyboard model ----------
+// MX Keys Mini, Turkish Q (ISO). Measured from product photos.
 // Units: 15 wide, 5.75 tall (the function row is 0.75 high).
+const FN_ROW = [
+  ["i-es", "1"], ["i-es", "2"], ["i-es", "3"], ["i-bldn"], ["i-blup"], ["i-dict"],
+  ["i-emoji"], ["i-shot"], ["i-micoff"], ["i-pp"], ["i-mute"], ["i-vdn"],
+];
 const KB = (() => {
   const keys = [];
   let y = 0;
@@ -199,40 +212,56 @@ const KB = (() => {
     }
     y += h;
   };
-  const F = n => ["f" + n, "F" + n, 1, { fkey: n }];
-  row(0.75, [["esc", "Esc", 1.5], ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(F), ["delete", "Del", 1.5]]);
-  row(1, [["oem_tick", '"', 1, { oem: true }], ..."1234567890".split("").map(c => [c, c]), ["oem_minus", "*", 1, { oem: true }], ["oem_eq", "-", 1, { oem: true }], ["backspace", "⌫", 2]]);
-  row(1, [["tab", "Tab", 1.5], ..."qwertyuiop".split("").map(c => [c, c.toUpperCase()]), ["oem_lb", "Ğ", 1, { oem: true }], ["oem_rb", "Ü", 1, { oem: true }], ["oem_bs", ",", 1.5, { oem: true }]]);
-  row(1, [["capslock", "Caps", 1.75], ..."asdfghjkl".split("").map(c => [c, c.toUpperCase()]), ["oem_semi", "Ş", 1, { oem: true }], ["oem_quote", "İ", 1, { oem: true }], ["enter", "Enter", 2.25]]);
-  row(1, [["lshift", "Shift", 2.25, { mod: "shift" }], ..."zxcvbnm".split("").map(c => [c, c.toUpperCase()]), ["oem_comma", "Ö", 1, { oem: true }], ["oem_period", "Ç", 1, { oem: true }], ["oem_slash", ".", 1, { oem: true }], ["rshift", "Shift", 2.75, { mod: "shift" }]]);
+  const F = n => ["f" + n, "F" + n, 1, { fkey: n, ico: FN_ROW[n - 1][0], num: FN_ROW[n - 1][1] || "", corner: "F" + n }];
+  row(0.75, [["esc", "esc"], ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(F), ["insert", "", 1, { ico: "i-vup", corner: "ins", cid: "mx:0x00e9" }], ["delete", "del"]]);
+  row(1, [["oem_tick", '"', 1, { oem: true }], ..."1234567890".split("").map(c => [c, c]), ["oem_minus", "*", 1, { oem: true }], ["oem_eq", "-", 1, { oem: true }], ["backspace", "backspace", 2]]);
+  const ey = y;
+  row(1, [["tab", "tab", 1.5], ..."qwertyuiop".split("").map(c => [c, c.toUpperCase()]), ["oem_lb", "Ğ", 1, { oem: true }], ["oem_rb", "Ü", 1, { oem: true }]]);
+  row(1, [["capslock", "caps lock", 1.75], ..."asdfghjkl".split("").map(c => [c, c.toUpperCase()]), ["oem_semi", "Ş", 1, { oem: true }], ["oem_quote", "İ", 1, { oem: true }], ["oem_bs", ",", 1, { oem: true }]]);
+  // ISO enter: drawn as the tall lower part; CSS adds the wider top lip
+  keys.push({ id: "enter", label: "enter", x: 13.75, y: ey, w: 1.25, h: 2, iso: true });
+  row(1, [["lshift", "shift", 1.25, { mod: "shift" }], ["oem_102", "<", 1, { oem: true }], ..."zxcvbnm".split("").map(c => [c, c.toUpperCase()]), ["oem_comma", "Ö", 1, { oem: true }], ["oem_period", "Ç", 1, { oem: true }], ["oem_slash", ".", 1, { oem: true }], ["rshift", "shift", 2.75, { mod: "shift" }]]);
   const by = y;
-  row(1, [["fn", "fn", 1, { dis: true }], ["lctrl", "Ctrl", 1, { mod: "ctrl" }], ["lwin", "Win", 1, { mod: "win" }], ["lalt", "Alt", 1, { mod: "alt" }], ["space", "", 6], ["ralt", "Alt Gr", 1, { mod: "alt" }], ["rctrl", "Ctrl", 1, { mod: "ctrl" }], ["left", "←", 1], [null, "", 1], ["right", "→", 1]]);
-  keys.push({ id: "up", label: "↑", x: 13, y: by, w: 1, h: 0.5, half: true }, { id: "down", label: "↓", x: 13, y: by + 0.5, w: 1, h: 0.5, half: true });
+  row(1, [["lctrl", "ctrl", 1.125, { mod: "ctrl" }], ["fn", "fn", 1, { dis: true }], ["lwin", "start", 1, { mod: "win" }], ["lalt", "alt", 1.125, { mod: "alt" }], ["space", "", 5.5], ["ralt", "alt gr", 1.125, { mod: "alt" }], ["rctrl", "ctrl", 1, { mod: "ctrl" }]]);
+  const half = { h: 0.5, half: true };
+  keys.push(
+    { id: "left", label: "◀", x: 11.875, y: by + 0.5, w: 1, ...half },
+    { id: "up", label: "▲", x: 12.875, y: by, w: 1, ...half },
+    { id: "down", label: "▼", x: 12.875, y: by + 0.5, w: 1, ...half },
+    { id: "right", label: "▶", x: 13.875, y: by + 0.5, w: 1.125, ...half },
+  );
   return keys;
 })();
 const KB_W = 15, KB_H = 5.75;
 const keyName = k => k.oem ? oemMap[k.id] || "" : k.id;
+
+function keyFace(k) {
+  if (k.ico) return `<span class="kl kico"><svg class="ic"><use href="#${k.ico}"/></svg>${k.num ? `<b>${k.num}</b>` : ""}</span><span class="corner">${k.corner}</span>`;
+  return `<span class="kl">${esc(k.label)}</span>`;
+}
 
 function buildKB(el, interactive) {
   el.classList.toggle("interactive", !!interactive);
   el.innerHTML = '<div class="kb-inner">' + KB.map(k => {
     const g = k.half ? 0.3 : 0.5;
     const style = `left:${k.x / KB_W * 100}%;top:${k.y / KB_H * 100}%;width:calc(${k.w / KB_W * 100}% - ${g}cqw);height:calc(${k.h / KB_H * 100}% - ${g}cqw)`;
-    const cls = ["key", k.fkey || k.id === "esc" || k.id === "delete" ? "fnrow" : "", k.half ? "half" : "", k.dis ? "dis" : ""].join(" ");
-    return `<button class="${cls}" data-k="${k.id}" style="${style}" tabindex="-1"><span class="kl">${esc(k.label)}</span><span class="sub"></span></button>`;
+    const cls = ["key", k.y === 0 ? "fnrow" : "", k.half ? "half" : "", k.dis ? "dis" : "", k.iso ? "iso" : "", k.label.length > 3 ? "word" : ""].join(" ");
+    return `<button class="${cls}" data-k="${k.id}" style="${style}" tabindex="-1">${keyFace(k)}<span class="sub"></span></button>`;
   }).join("") + "</div>";
   if (interactive) $$(".key", el).forEach(b => b.onclick = e => onKeyClick(KB.find(k => k.id === b.dataset.k), b, e));
 }
 
 const fkeyControl = n => controls.find(c => c.pos === n && c.divertable);
+// MX function behind a drawn key: F1–F12 by position, "ins" (volume up) by its CID
+const keyControl = k => k.fkey ? fkeyControl(k.fkey) : k.cid ? controls.find(c => c.cid === k.cid && c.divertable) : null;
 
 function decorateFKeys(el) {
-  KB.filter(k => k.fkey).forEach(k => {
+  KB.filter(k => k.fkey || k.cid).forEach(k => {
     const b = $(`[data-k="${k.id}"]`, el);
-    const c = fkeyControl(k.fkey);
+    const c = keyControl(k);
     b.classList.toggle("mx", !!c);
     $(".sub", b).textContent = c ? ctlName(c.cid) : "";
-    b.title = c ? `F${k.fkey} · MX: ${ctlName(c.cid) || c.cid}` : "";
+    b.title = c ? `${k.corner} · MX: ${ctlName(c.cid) || c.cid}` : "";
   });
 }
 
@@ -244,7 +273,7 @@ const SC_MAP = (() => {
     0x01: "esc", 0x0C: "oem_minus", 0x0D: "oem_eq", 0x0E: "backspace", 0x0F: "tab", 0x1A: "oem_lb", 0x1B: "oem_rb",
     0x1C: "enter", 0x1D: "lctrl", 0x27: "oem_semi", 0x28: "oem_quote", 0x29: "oem_tick", 0x2A: "lshift", 0x2B: "oem_bs",
     0x33: "oem_comma", 0x34: "oem_period", 0x35: "oem_slash", 0x36: "rshift", 0x38: "lalt", 0x39: "space", 0x3A: "capslock",
-    0x57: "f11", 0x58: "f12", 0xE01D: "rctrl", 0xE038: "ralt", 0xE053: "delete", 0xE05B: "lwin", 0xE05C: "lwin",
+    0x56: "oem_102", 0x57: "f11", 0x58: "f12", 0xE052: "insert", 0xE01D: "rctrl", 0xE038: "ralt", 0xE053: "delete", 0xE05B: "lwin", 0xE05C: "lwin",
     0xE048: "up", 0xE050: "down", 0xE04B: "left", 0xE04D: "right",
   };
   "1234567890".split("").forEach((c, i) => (m[0x02 + i] = c));
@@ -269,6 +298,53 @@ function liveKeys(on) {
   }
 }
 document.addEventListener("visibilitychange", () => liveKeys(!document.hidden && currentTab() === "home"));
+
+// ---------- window chrome ----------
+// In MX Helper's own window (cookie mxw=1) the page draws the title bar; dragging,
+// resizing from the top edge and the window buttons are forwarded to the host.
+const NATIVE = document.cookie.split("; ").includes(`mxw_${location.port}=1`);
+function initTitlebar() {
+  const tb = $("#titlebar");
+  tb.hidden = false;
+  document.body.classList.add("native");
+  const win = (cmd, hit) => fetch("/api/window", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cmd, hit }) }).catch(() => {});
+  const syncMax = async () => {
+    try { document.body.classList.toggle("maxed", !!(await api("GET", "/api/window")).max); } catch {}
+  };
+  let t;
+  addEventListener("resize", () => { clearTimeout(t); t = setTimeout(syncMax, 120); });
+  syncMax();
+  $$(".wbtn", tb).forEach(b => b.onclick = () => win(b.dataset.w));
+  $$(".rz", tb).forEach(r => r.onpointerdown = e => { if (e.button === 0) { e.preventDefault(); win("drag", r.dataset.hit); } });
+  // move only once the pointer actually moves, so a plain click or double click stays a click
+  tb.addEventListener("pointerdown", e => {
+    if (e.button !== 0 || e.target.closest(".wbtn, .rz")) return;
+    const x0 = e.screenX, y0 = e.screenY;
+    const move = ev => { if (Math.abs(ev.screenX - x0) + Math.abs(ev.screenY - y0) > 3) { stop(); win("drag", "caption"); } };
+    const stop = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", stop); };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", stop);
+  });
+  tb.addEventListener("dblclick", e => { if (!e.target.closest(".wbtn, .rz")) win("max"); });
+}
+if (NATIVE) initTitlebar();
+
+// Browser behaviour that makes no sense in an app: find (F3, Ctrl+F), reload, print,
+// new window, history navigation, the page context menu. Editing keys stay.
+document.addEventListener("keydown", e => {
+  const k = e.key, c = e.ctrlKey || e.metaKey;
+  if (["F1", "F3", "F5", "F6", "F7", "F10", "F11", "F12"].includes(k)
+    || ["BrowserBack", "BrowserForward", "BrowserRefresh", "BrowserSearch", "BrowserHome", "BrowserFavorites"].includes(k)
+    || (c && /^[fgprujhdnotwlek]$/i.test(k))
+    || (c && e.shiftKey && /^[ijcbnrtdeoa]$/i.test(k))
+    || (c && ["+", "-", "=", "0"].includes(k))
+    || (e.altKey && ["ArrowLeft", "ArrowRight", "Home"].includes(k))) e.preventDefault();
+}, true);
+document.addEventListener("contextmenu", e => {
+  if (!e.target.closest("input, textarea, [contenteditable]")) e.preventDefault();
+});
+["mousedown", "mouseup", "auxclick"].forEach(t => document.addEventListener(t, e => { if (e.button === 3 || e.button === 4) e.preventDefault(); }));
+["dragover", "drop"].forEach(t => document.addEventListener(t, e => { if (!e.defaultPrevented && !e.target.closest(".act")) e.preventDefault(); }));
 
 // ---------- nav ----------
 // switching tabs keeps an unsaved draft; it is still there when you come back
@@ -295,7 +371,7 @@ function seg(el, value, onPick) {
 let lastRunning = "";
 async function refreshState() {
   try { st = await api("GET", "/api/state"); } catch { return; }
-  $("#ver").textContent = st.version;
+  $("#ver").textContent = $("#verTb").textContent = st.version;
   const on = st.connected;
   $("#devPill").classList.toggle("on", on);
   $("#devText").textContent = on ? (st.name || "MX Keys") : "Bağlı değil";
@@ -552,7 +628,7 @@ function updateAssignKB() {
       const name = keyName(k);
       const t = name ? normTrig([...modsKey, name].join("+")) : "";
       if (t) { state = bound[t] || ""; sel = selMains.includes(name); }
-      const c = k.fkey && fkeyControl(k.fkey);
+      const c = keyControl(k);
       if (c && !modsKey.length) { state = state || bound[c.cid] || ""; sel = sel || c.cid === selTrig; }
       // part of a combination or chord that is bound: show it faintly
       if (!state && name && Object.keys(bound).some(x => trigMains(x).includes(name))) state = "inh";
@@ -562,12 +638,13 @@ function updateAssignKB() {
     b.classList.toggle("sel", sel);
   }
   $$(".mbtn").forEach(b => {
-    const t = b.dataset.trig;
-    b.classList.toggle("own", bound[t] === "own");
-    b.classList.toggle("inh", bound[t] === "inh");
-    b.classList.toggle("sel", t === selTrig);
+    const t = normTrig([...modsKey, b.dataset.trig].join("+"));
+    const used = !t && Object.keys(bound).some(x => x.split("+").pop() === b.dataset.trig);
+    b.classList.toggle("own", !!t && bound[t] === "own");
+    b.classList.toggle("inh", (!!t && bound[t] === "inh") || used);
+    b.classList.toggle("sel", hasMouse(selTrig) && selTrig.split("+").pop() === b.dataset.trig);
   });
-  const extra = controls.filter(c => c.divertable && !(c.pos >= 1 && c.pos <= 12));
+  const extra = controls.filter(c => c.divertable && !(c.pos >= 1 && c.pos <= 12) && !KB.some(k => k.cid === c.cid));
   $("#mxExtra").hidden = !extra.length;
   $("#mxExtra").innerHTML = extra.length ? "<span>Diğer MX tuşları:</span>" + extra.map(c => `<button data-cid="${c.cid}" class="${bound[c.cid] === "own" ? "own" : ""} ${c.cid === selTrig ? "sel" : ""}">${esc(ctlName(c.cid) || c.cid.slice(3))}</button>`).join("") : "";
   $$("#mxExtra button").forEach(b => b.onclick = () => handleKeyTrigger(b.dataset.cid));
@@ -577,8 +654,8 @@ function updateAssignKB() {
   hint.classList.toggle("picking", pickMode || mods.size > 0 || addKeyMode);
   hint.innerHTML = pickMode ? `“${esc(draft ? draft.name : "")}” için tetikleyici seç: bir tuşa tıkla. <a href="#" id="pickCancel">Vazgeç</a>`
     : addKeyMode ? `<b>${esc(trigText(selKey))} + …</b> kombinasyona eklenecek tuşa tıkla. <a href="#" id="addCancel">Vazgeç</a>`
-    : mods.size ? `<b>${MODS.filter(m => mods.has(m)).map(keyLabel).join(" + ")} + …</b> şimdi ana tuşa tıkla.`
-      : "Kombinasyon için önce <b>Ctrl</b>, <b>Alt</b>, <b>Shift</b> ya da <b>Win</b>’e tıkla.";
+    : mods.size ? `<b>${MODS.filter(m => mods.has(m)).map(keyLabel).join(" + ")} + …</b> şimdi bir tuşa ya da fare tuşuna tıkla.`
+      : "Kombinasyon için önce <b>Ctrl</b>, <b>Alt</b>, <b>Shift</b> ya da <b>Win</b>’e tıkla, sonra bir tuşa ya da fare tuşuna.";
   const pc = $("#pickCancel");
   if (pc) pc.onclick = e => { e.preventDefault(); pickMode = false; setView("editor"); };
   const ac = $("#addCancel");
@@ -612,14 +689,14 @@ async function onKeyClick(k, btn, e) {
   if (k.oem && !keyName(k)) {
     const t = await capture(`Klavyende “${k.label}” tuşuna bas`, "Bu tuşun kodu klavye düzenine göre değişiyor; bir kez basman yeterli, sonra hatırlanır.");
     const main = trigMain(t);
-    if (!main || main.startsWith("mx:") || ["mouse4", "mouse5", "middle"].includes(main)) return;
+    if (!main || main.startsWith("mx:") || MOUSE_TR[main]) return;
     oemMap[k.id] = main; store.set("oem", oemMap);
   }
-  const c = k.fkey && fkeyControl(k.fkey);
+  const c = keyControl(k);
   if (c && !mods.size) {
     keyMenu(e, [
       { html: `<b>MX işlevi</b> — ${esc(ctlName(c.cid) || c.cid)}`, fn: () => handleKeyTrigger(c.cid) },
-      { html: `<b>F${k.fkey}</b> tuşu (Fn ile)`, fn: () => handleKeyTrigger("f" + k.fkey) },
+      { html: `<b>${k.fkey ? "F" + k.fkey : "Insert"}</b> tuşu (Fn ile)`, fn: () => handleKeyTrigger(k.fkey ? "f" + k.fkey : "insert") },
     ]);
     return;
   }
@@ -627,7 +704,17 @@ async function onKeyClick(k, btn, e) {
   mods.clear();
   handleKeyTrigger(t);
 }
-$$(".mbtn").forEach(b => b.onclick = () => handleKeyTrigger(b.dataset.trig));
+$$(".mbtn").forEach(b => b.onclick = () => {
+  const btn = b.dataset.trig;
+  let t = normTrig([...mods, btn].join("+"));
+  if (addKeyMode && selKey && !selKey.startsWith("mx:") && !hasMouse(selKey)) t = normTrig(selKey + "+" + btn);
+  if (!t) {
+    toast(`${MOUSE_TR[btn]} tek başına atanamaz, yoksa fare normal çalışmaz. Önce Ctrl, Alt, Shift, Win ya da bir tuş seç (ör. Ctrl + ${MOUSE_TR[btn]}).`);
+    return;
+  }
+  mods.clear();
+  handleKeyTrigger(t);
+});
 
 function handleKeyTrigger(t) {
   t = normTrig(t);
@@ -635,8 +722,9 @@ function handleKeyTrigger(t) {
   if (addKeyMode) {
     // grow the selected combination: ctrl+q  +  e  ->  ctrl+e+q
     addKeyMode = false;
-    const plain = s => s && !s.startsWith("mx:") && !["mouse4", "mouse5", "middle"].includes(s);
-    if (plain(selKey) && plain(t)) t = normTrig(selKey + "+" + t);
+    // keys and at most one mouse button: ctrl+q + mouse5 -> ctrl+q+mouse5
+    const ok = s => s && !s.startsWith("mx:");
+    if (ok(selKey) && ok(t) && !(hasMouse(selKey) && hasMouse(t))) t = normTrig(selKey + "+" + t) || t;
   }
   if (pickMode && draft) {
     snapshot();
@@ -653,7 +741,7 @@ const trigText = t => {
   t = normTrig(t);
   if (!t) return "";
   if (t.startsWith("mx:")) return ctlName(t) || "MX tuşu";
-  return { mouse4: "Fare geri", mouse5: "Fare ileri", middle: "Fare orta" }[t] || t.split("+").map(keyLabel).join("+");
+  return t.split("+").map(keyLabel).join("+");
 };
 const short = (s, n = 32) => (s = String(s || "")).length > n ? s.slice(0, n - 1) + "…" : s;
 const BTN_TR = { left: "Sol", right: "Sağ", middle: "Orta", mouse4: "Yan 4", mouse5: "Yan 5" };
@@ -734,10 +822,10 @@ function renderKeyPanel() {
   }
   const own = cfg.macros.filter(m => inProfile(m, profile) && normTrig(m.trigger) === selKey);
   const inh = profile ? cfg.macros.filter(m => !m.app && normTrig(m.trigger) === selKey && !own.some(o => sameAct(o, m))) : [];
-  const plainKey = !selKey.startsWith("mx:") && !["mouse4", "mouse5", "middle"].includes(selKey);
+  const plainKey = !selKey.startsWith("mx:");
   let html = `<div class="kp-head"><div class="kp-trig">${triggerHTML(selKey)}</div><button class="icon-btn" id="kpClose" title="Kapat">${icon("i-x", "sm")}</button></div>
     <div class="kp-sub">${profile ? esc(profLabel(profile)) + " profili" : "Varsayılan profil · bütün programlar"}</div>
-    ${plainKey ? `<button class="btn ghost sm kp-addkey ${addKeyMode ? "active" : ""}" id="kpAddKey">${icon("i-plus", "sm")}${addKeyMode ? "Eklenecek tuşa tıkla…" : "Tuş ekle (kombinasyon)"}</button>` : ""}`;
+    ${plainKey ? `<button class="btn ghost sm kp-addkey ${addKeyMode ? "active" : ""}" id="kpAddKey">${icon("i-plus", "sm")}${addKeyMode ? "Eklenecek tuşa ya da fare tuşuna tıkla…" : "Tuş ekle (kombinasyon)"}</button>` : ""}`;
   // what is already bound to this key, for every activation
   html += own.map(m => macroCardHTML(m)).join("") + inh.map(m => macroCardHTML(m, true)).join("");
   const dupe = own.filter(m => m.enabled).some((m, i, a) => a.findIndex(o => sameAct(o, m)) !== i);
@@ -800,7 +888,7 @@ async function quickAssign(kind) {
   }
   if (kind === "shortcut") {
     const k = await capture("Gönderilecek kısayola bas", `${esc(trigText(t))} tuşuna basınca bu kısayol gönderilecek. Örneğin <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Esc</kbd>.`);
-    if (!k || k.startsWith("mx:") || ["mouse4", "mouse5", "middle"].includes(k)) return;
+    if (!isKeyOnly(k)) return;
     return addAssigned({ name: `${trigText(t)} → ${trigText(k)}`, actions: [{ type: "keys", keys: k }] });
   }
   if (kind === "text") {
@@ -1214,7 +1302,7 @@ function renderActions() {
   $$("[data-preset]", box).forEach(s => s.onchange = () => { if (!s.value) return; snapshot(); acts[+s.dataset.preset].keys = s.value; markDirty(); renderActions(); });
   $$("[data-cap]", box).forEach(b => b.onclick = async () => {
     const t = await capture("Gönderilecek tuşa bas", "Makronun basacağı tuş ya da kombinasyon.");
-    if (!t || t.startsWith("mx:") || ["mouse4", "mouse5", "middle"].includes(t)) return;
+    if (!isKeyOnly(t)) return;
     snapshot(); acts[+b.dataset.cap].keys = t; markDirty(); renderActions();
   });
   $$("[data-pos]", box).forEach(b => b.onclick = async () => {
