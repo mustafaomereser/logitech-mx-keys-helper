@@ -26,8 +26,10 @@ jobs:
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then VER="$GITHUB_REF_NAME"; else VER="dev-${GITHUB_SHA::7}"; fi
           mkdir -p dist
+          # icon + version info + manifest resource for this version
+          go run ./tools/genicon -version "$VER"
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
-            -ldflags "-s -w -H=windowsgui -X main.version=$VER" -o dist/MXHelper.exe .
+            -ldflags "-H=windowsgui -X main.version=$VER" -o dist/MXHelper.exe .
           # the in-app updater refuses to install without this checksum
           (cd dist && sha256sum MXHelper.exe > MXHelper.exe.sha256)
 

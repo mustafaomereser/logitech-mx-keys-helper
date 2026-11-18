@@ -1,5 +1,8 @@
 # Değişiklikler
 
+## v0.3.6
+- **Defender yanlış alarmı (Trojan:Win32/Bearfoos.A!ml) için önlemler:** exe artık sürüm bilgisi (şirket, açıklama, sürüm) ve uygulama bildirimi (manifest) taşıyor, sembolleri silinmiyor. Onarım komutları gizlenmiş (`-EncodedCommand`) değil, `%APPDATA%\MXHelper\scripts` içindeki düz `.ps1` dosyalarıyla çalışıyor. Bu, imzasız bir programın yapay zekâ tabanlı tespitten tamamen kurtulacağının garantisi değil; tespit sürerse Microsoft'a yanlış alarm olarak bildirilmeli.
+
 ## v0.3.5
 - **Düzeltme: onarım Bluetooth'u kapatıp açamıyordu.** Intel Wireless Bluetooth adaptöründe eski yöntem "desteklenmiyor" hatası veriyordu. Bluetooth artık Windows'un hızlı ayarlardaki düğmesinin kullandığı yolla kapatılıp açılıyor; olmazsa yedek olarak `pnputil` ile aygıt kapatılıp açılıyor.
 - Seviye 1'de klavye düğümü yeniden başlatılamazsa (Windows "yeniden başlatma bekleniyor" derse) onarım boşa bitmiyor, aynı adımda Bluetooth kapatılıp açılıyor.

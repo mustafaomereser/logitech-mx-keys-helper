@@ -1,7 +1,8 @@
 VERSION ?= dev
-LDFLAGS := -s -w -H=windowsgui -X main.version=$(VERSION)
+LDFLAGS := -H=windowsgui -X main.version=$(VERSION)
 
 build:
+	go run ./tools/genicon -version $(VERSION)
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/MXHelper.exe .
 
 vet:

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -96,23 +95,34 @@ Start-Sleep -Seconds 6
 `, time.Now().Format("2006-01-02 15:04:05"), level, body, strings.ReplaceAll(logPath, "'", "''"))
 }
 
-func encodePS(script string) string {
-	u := utf16.Encode([]rune(script))
-	b := make([]byte, len(u)*2)
-	for i, c := range u {
-		b[i*2], b[i*2+1] = byte(c), byte(c>>8)
-	}
-	return base64.StdEncoding.EncodeToString(b)
-}
-
+// runPowerShell runs a script file (not -EncodedCommand: encoded command lines look
+// like malware to antivirus heuristics). Scripts go to %APPDATA%\MXHelper\scripts
+// with a UTF-8 BOM so Windows PowerShell 5.1 reads the Turkish text correctly.
 func runPowerShell(script string, elevated bool) error {
-	args := "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + encodePS(script)
-	if elevated && !isElevated() {
-		return shellExecute("runas", "powershell.exe", args, 0)
+	dir := filepath.Join(appDir(), "scripts")
+	os.MkdirAll(dir, 0700)
+	if old, _ := filepath.Glob(filepath.Join(dir, "*.ps1")); len(old) > 0 {
+		for _, f := range old {
+			if fi, err := os.Stat(f); err == nil && time.Since(fi.ModTime()) > time.Hour {
+				os.Remove(f)
+			}
+		}
 	}
-	cmd := exec.Command("powershell.exe", strings.Fields(args)...)
+	f, err := os.CreateTemp(dir, "mxhelper-*.ps1")
+	if err != nil {
+		return err
+	}
+	f.WriteString("\xEF\xBB\xBF" + script) // UTF-8 BOM
+	f.Close()
+	args := []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", f.Name()}
+	if elevated && !isElevated() {
+		return shellExecute("runas", "powershell.exe", strings.Join(args[:6], " ")+` -File "`+f.Name()+`"`, 0)
+	}
+	cmd := exec.Command("powershell.exe", args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	return cmd.Run()
+	err = cmd.Run()
+	os.Remove(f.Name())
+	return err
 }
 
 func (r *repairState) repair(reason string) {

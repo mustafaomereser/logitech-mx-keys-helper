@@ -2,21 +2,28 @@
 //
 //	assets/app.ico               multi-size icon (16…256, PNG entries)
 //	web/icon.png                 256 px, used as the GUI window icon
-//	rsrc_windows_amd64.syso      COFF resource object; `go build` links it so the exe has an icon
+//	rsrc_windows_amd64.syso      COFF resource object: icon, version info, manifest; `go build` links it
 //
-// Run from the repo root: go run ./tools/genicon
+// Run from the repo root: go run ./tools/genicon -version v0.3.6
+// (build.ps1, the Makefile and CI do this so the exe carries its version).
 // Standard library only (no rsrc / go-winres), to keep the project free of third-party modules.
 package main
 
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"log"
 	"math"
 	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"unicode/utf16"
 )
 
 var sizes = []int{16, 20, 24, 32, 40, 48, 64, 128, 256}
@@ -132,39 +139,52 @@ func writeICO(path string, imgs [][]byte) {
 	must(os.WriteFile(path, w.Bytes(), 0644))
 }
 
-// writeSyso writes a COFF object with one .rsrc section holding RT_ICON entries
-// (IDs 1..n) and one RT_GROUP_ICON (ID 1). Data-entry RVAs are fixed up by the
+// resource is one entry of the .rsrc section.
+type resource struct {
+	typ, id uint32
+	data    []byte
+}
+
+// writeSyso writes a COFF object with one .rsrc section holding the given resources
+// (sorted by type, then id; language en-US). Data-entry RVAs are fixed up by the
 // linker through IMAGE_REL_AMD64_ADDR32NB relocations against the section symbol.
-func writeSyso(path string, imgs [][]byte) {
+func writeSyso(path string, res []resource) {
 	const (
-		rtIcon      = 3
-		rtGroupIcon = 14
 		lang        = 0x0409
 		dirSize     = 16
 		entrySize   = 8
 		dataEntSize = 16
 	)
-	n := len(imgs)
-	var grp bytes.Buffer
-	le(&grp, uint16(0), uint16(1), uint16(n))
-	for i, d := range imgs {
-		le(&grp, dim(sizes[i]), dim(sizes[i]), uint8(0), uint8(0), uint16(1), uint16(32), uint32(len(d)), uint16(i+1))
+	sort.Slice(res, func(i, j int) bool {
+		if res[i].typ != res[j].typ {
+			return res[i].typ < res[j].typ
+		}
+		return res[i].id < res[j].id
+	})
+	var types []uint32
+	byType := map[uint32][]int{}
+	for i, r := range res {
+		if len(byType[r.typ]) == 0 {
+			types = append(types, r.typ)
+		}
+		byType[r.typ] = append(byType[r.typ], i)
 	}
-	blobs := append(append([][]byte{}, imgs...), grp.Bytes()) // n icons + group
-
-	// layout: root dir, type dirs, name dirs (lang level), data entries, data
-	rootOff := 0
-	iconTypeOff := rootOff + dirSize + 2*entrySize
-	groupTypeOff := iconTypeOff + dirSize + n*entrySize
-	langOff := groupTypeOff + dirSize + entrySize // n+1 lang dirs follow
-	dataEntOff := langOff + (n+1)*(dirSize+entrySize)
-	dataOff := dataEntOff + (n+1)*dataEntSize
+	n := len(res)
+	// layout: root dir, one name dir per type, one lang dir per resource, data entries, data
+	typeOff := map[uint32]int{}
+	p := dirSize + len(types)*entrySize
+	for _, t := range types {
+		typeOff[t] = p
+		p += dirSize + len(byType[t])*entrySize
+	}
+	langOff := p
+	dataEntOff := langOff + n*(dirSize+entrySize)
+	p = dataEntOff + n*dataEntSize
 	var blobOff []int
-	p := dataOff
-	for _, b := range blobs {
+	for _, r := range res {
 		p = (p + 7) &^ 7
 		blobOff = append(blobOff, p)
-		p += len(b)
+		p += len(r.data)
 	}
 	sec := make([]byte, (p+7)&^7)
 	put32 := func(at int, v uint32) { binary.LittleEndian.PutUint32(sec[at:], v) }
@@ -172,33 +192,29 @@ func writeSyso(path string, imgs [][]byte) {
 	dir := func(at, ids int) { put16(at+14, uint16(ids)) }
 	const sub = 0x80000000
 
-	dir(rootOff, 2)
-	put32(rootOff+16, rtIcon)
-	put32(rootOff+20, sub|uint32(iconTypeOff))
-	put32(rootOff+24, rtGroupIcon)
-	put32(rootOff+28, sub|uint32(groupTypeOff))
-
-	dir(iconTypeOff, n)
-	for i := 0; i < n; i++ {
-		e := iconTypeOff + dirSize + i*entrySize
-		put32(e, uint32(i+1))
-		put32(e+4, sub|uint32(langOff+i*(dirSize+entrySize)))
+	dir(0, len(types))
+	for i, t := range types {
+		e := dirSize + i*entrySize
+		put32(e, t)
+		put32(e+4, sub|uint32(typeOff[t]))
+		dir(typeOff[t], len(byType[t]))
+		for j, ri := range byType[t] {
+			e := typeOff[t] + dirSize + j*entrySize
+			put32(e, res[ri].id)
+			put32(e+4, sub|uint32(langOff+ri*(dirSize+entrySize)))
+		}
 	}
-	dir(groupTypeOff, 1)
-	put32(groupTypeOff+16, 1)
-	put32(groupTypeOff+20, sub|uint32(langOff+n*(dirSize+entrySize)))
-
 	var relocs []int
-	for i := 0; i <= n; i++ {
+	for i, r := range res {
 		ld := langOff + i*(dirSize+entrySize)
 		dir(ld, 1)
 		put32(ld+16, lang)
 		put32(ld+20, uint32(dataEntOff+i*dataEntSize))
 		de := dataEntOff + i*dataEntSize
 		put32(de, uint32(blobOff[i])) // section-relative; the reloc adds the section RVA
-		put32(de+4, uint32(len(blobs[i])))
+		put32(de+4, uint32(len(r.data)))
 		relocs = append(relocs, de)
-		copy(sec[blobOff[i]:], blobs[i])
+		copy(sec[blobOff[i]:], r.data)
 	}
 
 	var w bytes.Buffer
@@ -222,6 +238,86 @@ func writeSyso(path string, imgs [][]byte) {
 	must(os.WriteFile(path, w.Bytes(), 0644))
 }
 
+// ---------- RT_VERSION ----------
+
+func utf16z(s string) []byte {
+	var b bytes.Buffer
+	for _, c := range utf16.Encode([]rune(s)) {
+		le(&b, c)
+	}
+	le(&b, uint16(0))
+	return b.Bytes()
+}
+
+// vnode builds one VS_VERSIONINFO-style node: wLength, wValueLength, wType, key, value, children.
+func vnode(key string, text bool, value []byte, valueLen int, children ...[]byte) []byte {
+	var b bytes.Buffer
+	typ := uint16(0)
+	if text {
+		typ = 1
+	}
+	le(&b, uint16(0), uint16(valueLen), typ)
+	b.Write(utf16z(key))
+	pad := func() {
+		for b.Len()%4 != 0 {
+			b.WriteByte(0)
+		}
+	}
+	pad()
+	b.Write(value)
+	for _, c := range children {
+		pad()
+		b.Write(c)
+	}
+	out := b.Bytes()
+	binary.LittleEndian.PutUint16(out, uint16(len(out)))
+	return out
+}
+
+// versionInfo: file/product version and the strings Explorer shows under Details.
+func versionInfo(ver string) []byte {
+	nums := [4]uint16{}
+	for i, part := range strings.SplitN(strings.TrimPrefix(ver, "v"), ".", 4) {
+		v, _ := strconv.Atoi(strings.TrimFunc(part, func(r rune) bool { return r < '0' || r > '9' }))
+		nums[i] = uint16(v)
+	}
+	ms, ls := uint32(nums[0])<<16|uint32(nums[1]), uint32(nums[2])<<16|uint32(nums[3])
+	var fixed bytes.Buffer
+	le(&fixed, uint32(0xFEEF04BD), uint32(0x00010000), ms, ls, ms, ls, uint32(0x3F), uint32(0), uint32(0x00040004), uint32(1), uint32(0), uint32(0), uint32(0))
+	dotted := fmt.Sprintf("%d.%d.%d.%d", nums[0], nums[1], nums[2], nums[3])
+	str := func(k, v string) []byte { return vnode(k, true, utf16z(v), len(utf16.Encode([]rune(v)))+1) }
+	table := vnode("040904B0", true, nil, 0,
+		str("CompanyName", "mustafaomereser"),
+		str("FileDescription", "MX Helper - Logitech MX Keys Mini helper"),
+		str("FileVersion", dotted),
+		str("InternalName", "MXHelper"),
+		str("LegalCopyright", "Copyright (c) 2026 mustafaomereser"),
+		str("OriginalFilename", "MXHelper.exe"),
+		str("ProductName", "MX Helper"),
+		str("ProductVersion", dotted),
+		str("Comments", "https://github.com/mustafaomereser/logitech-mx-keys-helper"),
+	)
+	var tr bytes.Buffer
+	le(&tr, uint16(0x0409), uint16(0x04B0))
+	return vnode("VS_VERSION_INFO", false, fixed.Bytes(), fixed.Len(),
+		vnode("StringFileInfo", true, nil, 0, table),
+		vnode("VarFileInfo", true, nil, 0, vnode("Translation", false, tr.Bytes(), tr.Len())),
+	)
+}
+
+const manifest = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="mustafaomereser.MXHelper" version="1.0.0.0" processorArchitecture="amd64"/>
+  <description>MX Helper</description>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security><requestedPrivileges><requestedExecutionLevel level="asInvoker" uiAccess="false"/></requestedPrivileges></security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application><supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/></application>
+  </compatibility>
+</assembly>
+`
+
 func must(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -229,12 +325,27 @@ func must(err error) {
 }
 
 func main() {
+	ver := flag.String("version", "0.0.0", "version written into the exe's version resource")
+	flag.Parse()
 	var imgs [][]byte
 	for _, s := range sizes {
 		imgs = append(imgs, pngBytes(draw(s)))
 	}
 	writeICO("assets/app.ico", imgs)
 	must(os.WriteFile("web/icon.png", imgs[len(imgs)-1], 0644))
-	writeSyso("rsrc_windows_amd64.syso", imgs)
+	n := len(imgs)
+	var grp bytes.Buffer
+	le(&grp, uint16(0), uint16(1), uint16(n))
+	res := []resource{}
+	for i, d := range imgs {
+		le(&grp, dim(sizes[i]), dim(sizes[i]), uint8(0), uint8(0), uint16(1), uint16(32), uint32(len(d)), uint16(i+1))
+		res = append(res, resource{3, uint32(i + 1), d}) // RT_ICON
+	}
+	res = append(res,
+		resource{14, 1, grp.Bytes()},       // RT_GROUP_ICON
+		resource{16, 1, versionInfo(*ver)}, // RT_VERSION
+		resource{24, 1, []byte(manifest)},  // RT_MANIFEST
+	)
+	writeSyso("rsrc_windows_amd64.syso", res)
 	log.Printf("assets/app.ico, web/icon.png, rsrc_windows_amd64.syso yazıldı (%d boyut)", len(sizes))
 }

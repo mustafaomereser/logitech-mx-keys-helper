@@ -2,7 +2,8 @@
 param([string]$Version = "dev")
 $env:GOOS = "windows"; $env:GOARCH = "amd64"; $env:CGO_ENABLED = "0"
 New-Item -ItemType Directory -Force dist | Out-Null
+$env:GOOS = ""; go run ./tools/genicon -version $Version; $env:GOOS = "windows"
 go vet ./...
 if ($LASTEXITCODE -ne 0) { exit 1 }
-go build -trimpath -ldflags "-s -w -H=windowsgui -X main.version=$Version" -o dist/MXHelper.exe .
+go build -trimpath -ldflags "-H=windowsgui -X main.version=$Version" -o dist/MXHelper.exe .
 if ($LASTEXITCODE -eq 0) { Write-Host "dist/MXHelper.exe hazır" }
