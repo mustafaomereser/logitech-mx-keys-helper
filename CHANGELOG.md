@@ -1,5 +1,8 @@
 # Değişiklikler
 
+## v0.3.3
+- Genel bakıştaki klavye çiziminde MX Keys Mini'de bastığın tuşlar canlı olarak yanar (laptop klavyesi değil, sadece MX). Tuşlar fiziksel konumlarına göre eşlenir, Türkçe Q'da da doğru yanar. Sayfa açık değilken hiçbir şey dinlenmez.
+
 ## v0.3.2
 - **Çok tuşlu kombinasyonlar:** Birden fazla normal tuşa birlikte basmak tetikleyici olabiliyor (ör. `Q+E`, `Ctrl+A+S`); basma sırası önemsiz. Klavye panelindeki "Tuş ekle" ile kurulur.
 - **Ne zaman çalışsın:** Her makro için *Basınca*, *Basılı tutunca* (ör. 3 sn) ya da *Art arda basınca* (ör. 3 kez, aralarında en fazla 350 ms) seçilebiliyor. Aynı tuşa her biri için ayrı makro bağlanabilir.

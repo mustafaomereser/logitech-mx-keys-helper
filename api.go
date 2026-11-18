@@ -210,6 +210,7 @@ func startGUIServer() error {
 		x, y := cursorPos()
 		writeJSON(w, map[string]any{"x": x, "y": y})
 	})
+	api("GET /api/keys/stream", apiKeyStream)
 	api("GET /api/update", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, updateSnapshot()) })
 	api("POST /api/update/check", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, checkUpdate()) })
 	api("POST /api/update/apply", func(w http.ResponseWriter, r *http.Request) {

@@ -236,6 +236,40 @@ function decorateFKeys(el) {
   });
 }
 
+// ---------- live key lighting (overview) ----------
+// The backend streams scan codes from the MX keyboard; scan codes are physical
+// positions, so this works for any layout (Turkish Q included).
+const SC_MAP = (() => {
+  const m = {
+    0x01: "esc", 0x0C: "oem_minus", 0x0D: "oem_eq", 0x0E: "backspace", 0x0F: "tab", 0x1A: "oem_lb", 0x1B: "oem_rb",
+    0x1C: "enter", 0x1D: "lctrl", 0x27: "oem_semi", 0x28: "oem_quote", 0x29: "oem_tick", 0x2A: "lshift", 0x2B: "oem_bs",
+    0x33: "oem_comma", 0x34: "oem_period", 0x35: "oem_slash", 0x36: "rshift", 0x38: "lalt", 0x39: "space", 0x3A: "capslock",
+    0x57: "f11", 0x58: "f12", 0xE01D: "rctrl", 0xE038: "ralt", 0xE053: "delete", 0xE05B: "lwin", 0xE05C: "lwin",
+    0xE048: "up", 0xE050: "down", 0xE04B: "left", 0xE04D: "right",
+  };
+  "1234567890".split("").forEach((c, i) => (m[0x02 + i] = c));
+  "qwertyuiop".split("").forEach((c, i) => (m[0x10 + i] = c));
+  "asdfghjkl".split("").forEach((c, i) => (m[0x1E + i] = c));
+  "zxcvbnm".split("").forEach((c, i) => (m[0x2C + i] = c));
+  for (let i = 0; i < 10; i++) m[0x3B + i] = "f" + (i + 1);
+  return m;
+})();
+let keySrc = null;
+function liveKeys(on) {
+  if (on && !keySrc && window.EventSource) {
+    keySrc = new EventSource("/api/keys/stream");
+    keySrc.onmessage = e => {
+      let ev; try { ev = JSON.parse(e.data); } catch { return; }
+      const b = SC_MAP[ev.sc] && $(`#kbHome [data-k="${SC_MAP[ev.sc]}"]`);
+      if (b) b.classList.toggle("press", !!ev.d);
+    };
+  } else if (!on && keySrc) {
+    keySrc.close(); keySrc = null;
+    $$("#kbHome .key.press").forEach(b => b.classList.remove("press"));
+  }
+}
+document.addEventListener("visibilitychange", () => liveKeys(!document.hidden && currentTab() === "home"));
+
 // ---------- nav ----------
 // switching tabs keeps an unsaved draft; it is still there when you come back
 function go(tab, noHash) {
@@ -243,6 +277,7 @@ function go(tab, noHash) {
   $$(".tab").forEach(t => t.classList.toggle("active", t.id === "tab-" + tab));
   store.set("tab", tab);
   if (tab === "adv") loadRaw();
+  liveKeys(tab === "home" && !document.hidden);
   if (tab === "macros" && !noHash) setView(view);
   else if (!noHash) setHash();
 }

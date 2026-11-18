@@ -42,6 +42,7 @@ const (
 	ridevInputSink  = 0x00000100
 	ridevDevNotify  = 0x00002000
 	riKeyBreak      = 0x01
+	riKeyE0         = 0x02
 )
 
 func registerRawInput(hwnd uintptr) error {
@@ -150,6 +151,13 @@ func handleRawInput(lparam uintptr) {
 			return
 		}
 		kb := (*rawKeyboard)(unsafe.Pointer(&body[0]))
+		if kb.VKey != 0xFF && keyFeedActive() {
+			sc := kb.MakeCode
+			if kb.Flags&riKeyE0 != 0 {
+				sc |= 0xE000
+			}
+			publishKey(keyEvent{SC: sc, Down: kb.Flags&riKeyBreak == 0})
+		}
 		if kb.Flags&riKeyBreak != 0 || kb.VKey == 0 || kb.VKey == 0xFF {
 			return
 		}
