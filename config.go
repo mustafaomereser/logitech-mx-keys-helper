@@ -16,19 +16,39 @@ import (
 )
 
 type Action struct {
-	Type    string            `json:"type"`              // text | keys | keydown | keyup | click | mousedown | mouseup | run | shell | url | http | backlight | repair | delay
+	Type    string            `json:"type"`              // text | keys | keydown | keyup | click | mousedown | mouseup | move | scroll | run | shell | url | http | backlight | gamemode | repair | delay
 	Text    string            `json:"text,omitempty"`    // text
 	Keys    string            `json:"keys,omitempty"`    // keys / keydown / keyup: "ctrl+shift+esc", "space"
 	Button  string            `json:"button,omitempty"`  // click / mousedown / mouseup: left | right | middle | mouse4 | mouse5
 	HoldMs  int               `json:"hold_ms,omitempty"` // keys / click: how long to hold before releasing
+	Count   int               `json:"count,omitempty"`   // click: 2 = double click
+	X       int               `json:"x,omitempty"`       // move: screen pixel (or delta when Rel)
+	Y       int               `json:"y,omitempty"`       // move
+	Rel     bool              `json:"rel,omitempty"`     // move: relative to the current position
+	Amount  int               `json:"amount,omitempty"`  // scroll: notches, positive = up / right
+	Horiz   bool              `json:"horiz,omitempty"`   // scroll: horizontal wheel
 	Cmd     string            `json:"cmd,omitempty"`     // run / shell
 	Args    string            `json:"args,omitempty"`    // run
 	URL     string            `json:"url,omitempty"`     // url / http
 	Method  string            `json:"method,omitempty"`  // http
 	Body    string            `json:"body,omitempty"`    // http
 	Headers map[string]string `json:"headers,omitempty"` // http
-	Value   string            `json:"value,omitempty"`   // backlight: up|down|toggle|auto|off|0..N
+	Value   string            `json:"value,omitempty"`   // backlight: up|down|toggle|auto|off|0..N; gamemode: toggle|on|off
 	Ms      int               `json:"ms,omitempty"`      // delay
+	MsMax   int               `json:"ms_max,omitempty"`  // delay: when > ms, wait a random time in [ms, ms_max]
+}
+
+// GameMode blocks keys that throw you out of a game.
+type GameMode struct {
+	Enabled     bool     `json:"enabled"`       // on regardless of the foreground app
+	Apps        []string `json:"apps"`          // turns on automatically while one of these is in the foreground
+	BlockWin    bool     `json:"block_win"`     // Windows keys
+	BlockAltTab bool     `json:"block_alt_tab"` // Alt+Tab
+	BlockAltF4  bool     `json:"block_alt_f4"`  // Alt+F4
+}
+
+func (g GameMode) configured() bool {
+	return (g.Enabled || len(g.Apps) > 0) && (g.BlockWin || g.BlockAltTab || g.BlockAltF4)
 }
 
 // Macro: trigger + mode + actions.
@@ -126,8 +146,12 @@ type Config struct {
 		PoweredSec           int             `json:"powered_seconds"`
 		Rules                []BacklightRule `json:"rules"`
 	} `json:"backlight"`
-	Macros    []Macro `json:"macros"`
-	StopCombo string  `json:"stop_all_combo"`
+	Macros    []Macro  `json:"macros"`
+	StopCombo string   `json:"stop_all_combo"`
+	GameMode  GameMode `json:"game_mode"`
+	Update    struct {
+		Mode string `json:"mode"` // ask | auto | off
+	} `json:"update"`
 }
 
 // mxTriggerCIDs returns the MX key CIDs used by enabled macros.
@@ -151,6 +175,7 @@ const defaultConfig = `{
   "poll_seconds": 10,
   "low_battery_warn_percent": 10,
   "stop_all_combo": "ctrl+alt+pause",
+  "game_mode": { "enabled": false, "apps": [], "block_win": true, "block_alt_tab": false, "block_alt_f4": false },
   "repair": { "auto": "ask", "media_presses_to_suspect": 3 },
   "backlight": {
     "default": "leave",
@@ -214,6 +239,12 @@ func applyDefaults(c *Config) {
 	}
 	if c.StopCombo == "" {
 		c.StopCombo = "ctrl+alt+pause"
+	}
+	if c.Update.Mode == "" {
+		c.Update.Mode = "ask"
+	}
+	if c.GameMode.Apps == nil {
+		c.GameMode.Apps = []string{}
 	}
 	for i := range c.Macros {
 		m := &c.Macros[i]

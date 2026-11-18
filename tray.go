@@ -100,6 +100,7 @@ const (
 	mfChecked   = 0x0008
 	mfPopup     = 0x0010
 	mfSeparator = 0x0800
+	mftRadio    = 0x0200 // MFT_RADIOCHECK: bullet instead of a tick
 )
 
 var (
@@ -165,7 +166,10 @@ func trayAdd() {
 	n := baseNID()
 	n.Flags = nifMessage | nifIcon | nifTip | nifShowTip
 	n.CallbackMessage = wmTray
-	n.Icon = iconOff
+	n.Icon = batteryTrayIcon(false, batteryState{})
+	if n.Icon == 0 {
+		n.Icon = iconOff
+	}
 	u16copy(n.Tip[:], "MX Helper")
 	pShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&n)))
 	n.Version = 4
@@ -190,10 +194,15 @@ func updateTray() {
 	notifyMu.Lock()
 	online := trayOnline
 	notifyMu.Unlock()
-	if online {
-		n.Icon = iconOn
-	} else {
+	n.Icon = batteryTrayIcon(online && conn, b)
+	if n.Icon == 0 { // drawing failed: fall back to the embedded icons
 		n.Icon = iconOff
+		if online {
+			n.Icon = iconOn
+		}
+	}
+	if gm, _ := gameModeActive(); gm {
+		tip += " - oyun modu"
 	}
 	u16copy(n.Tip[:], tip)
 	pShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&n)))
@@ -238,6 +247,8 @@ const (
 	idOpenRepairLog
 	idDiag
 	idAutostart
+	idGameMode
+	idUpdate
 	idQuit
 	idBlLevelBase = 100
 )
@@ -259,62 +270,95 @@ func showMenu() {
 	m, _, _ := pCreatePopupMenu.Call()
 	defer pDestroyMenu.Call(m)
 
-	status := "Bağlı değil"
+	// status row: battery glyph in the level colour, name, and the percentage right-aligned
+	if name == "" {
+		name = "MX Keys Mini"
+	}
+	status := name + "\tbağlı değil"
 	if conn {
-		status = name + ": bağlı"
-	}
-	appendMenu(m, mfString, idOpenGUI, "MX Helper'ı aç")
-	appendMenu(m, mfSeparator, 0, "")
-	appendMenu(m, mfGrayed, idStatus, status)
-	if b.Known {
-		s := fmt.Sprintf("Pil: %%%d", b.Percent)
-		if b.Charging {
-			s += " (şarj oluyor)"
-		} else if b.Full {
-			s += " (dolu)"
+		switch {
+		case !b.Known:
+			status = name + "\tbağlı"
+		case b.Charging:
+			status = fmt.Sprintf("%s\t%%%d · şarjda", name, b.Percent)
+		default:
+			status = fmt.Sprintf("%s\t%%%d", name, b.Percent)
 		}
-		appendMenu(m, mfGrayed, idBattery, s)
+	}
+	appendMenu(m, mfString, idStatus, status)
+	bmp := menuBatteryBitmap(conn, b)
+	if bmp != 0 {
+		setMenuItemBitmap(m, idStatus, bmp)
+		defer pDeleteObject.Call(bmp)
+	}
+	pSetMenuDefaultItm.Call(m, idStatus, 0) // bold; also what a double-click would do
+	if u := updateSnapshot(); u.Available {
+		label := "Güncelle: " + u.Latest
+		if u.State == "downloading" || u.State == "installing" {
+			label = fmt.Sprintf("Güncelleniyor… %%%d", u.Progress)
+		}
+		appendMenu(m, mfString, idUpdate, label)
 	}
 	appendMenu(m, mfSeparator, 0, "")
-	appendMenu(m, mfString, idRepairNow, "Klavyeyi şimdi onar  (kısayol: Mute ×3)")
-
-	sub, _, _ := pCreatePopupMenu.Call()
-	appendMenu(sub, check(c.Repair.Auto == "ask"), idAutoAsk, "Takılmayı fark edince sor")
-	appendMenu(sub, check(c.Repair.Auto == "auto"), idAutoAuto, "Takılmayı fark edince sormadan onar")
-	appendMenu(sub, check(c.Repair.Auto == "off"), idAutoOff, "Kapalı (sadece Mute ×3)")
-	appendMenu(m, mfPopup, sub, "Otomatik onarım")
+	appendMenu(m, mfString, idRepairNow, "Klavyeyi onar\tMute ×3")
+	if len(engine.runningIDs()) > 0 {
+		appendMenu(m, mfString, idStopAll, "Çalışan makroları durdur")
+	}
+	appendMenu(m, mfSeparator, 0, "")
 
 	bls, _, _ := pCreatePopupMenu.Call()
 	if blKnown {
-		appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 1), idBlAuto, "Otomatik (ortam ışığı)")
-		appendMenu(bls, check(bl.Enabled == 0), idBlOff, "Kapalı")
+		appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 1)|mftRadio, idBlAuto, "Otomatik")
+		appendMenu(bls, check(bl.Enabled == 0)|mftRadio, idBlOff, "Kapalı")
+		appendMenu(bls, mfSeparator, 0, "")
 		levels := bl.Levels
 		if levels <= 0 {
 			levels = 8
 		}
 		for i := 0; i < levels && i < 32; i++ {
-			appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 3 && int(bl.Level) == i), uintptr(idBlLevelBase+i), fmt.Sprintf("Manuel seviye %d", i))
+			appendMenu(bls, check(bl.Enabled != 0 && bl.Mode() == 3 && int(bl.Level) == i)|mftRadio, uintptr(idBlLevelBase+i), fmt.Sprintf("Seviye %d", i))
 		}
 		appendMenu(bls, mfSeparator, 0, "")
-		appendMenu(bls, mfString, idBlRules, "Kurallara dön (elle seçimi bırak)")
+		appendMenu(bls, mfString, idBlRules, "Kurallara dön")
 	} else {
 		appendMenu(bls, mfGrayed, 0, "Klavye bağlı değil")
 	}
-	appendMenu(m, mfPopup, bls, "Arka ışık")
+	blText := "Arka ışık"
+	if blKnown {
+		switch {
+		case bl.Enabled == 0:
+			blText += "\tkapalı"
+		case bl.Mode() == 1:
+			blText += "\totomatik"
+		default:
+			blText += fmt.Sprintf("\tseviye %d", bl.Level)
+		}
+	}
+	appendMenu(m, mfPopup, bls, blText)
+
+	gm, _ := gameModeActive()
+	appendMenu(m, check(gm), idGameMode, "Oyun modu")
+
+	sub, _, _ := pCreatePopupMenu.Call()
+	appendMenu(sub, check(c.Repair.Auto == "ask")|mftRadio, idAutoAsk, "Bildirimle sor")
+	appendMenu(sub, check(c.Repair.Auto == "auto")|mftRadio, idAutoAuto, "Sormadan onar")
+	appendMenu(sub, check(c.Repair.Auto == "off")|mftRadio, idAutoOff, "Bir şey yapma (sadece Mute ×3)")
+	appendMenu(m, mfPopup, sub, "Takılma fark edilince")
+	appendMenu(m, mfSeparator, 0, "")
 
 	mgr.mu.Lock()
 	learn := mgr.learnMode
 	mgr.mu.Unlock()
-	appendMenu(m, check(learn), idLearn, "Tuş öğrenme modu (MX özel tuş kodları)")
-	if len(engine.runningIDs()) > 0 {
-		appendMenu(m, mfString, idStopAll, "Çalışan makroları durdur")
-	}
-	appendMenu(m, mfSeparator, 0, "")
-	appendMenu(m, mfString, idOpenCfg, "Ayarları aç (config.json)")
-	appendMenu(m, mfString, idOpenLog, "Günlüğü aç")
-	appendMenu(m, mfString, idOpenRepairLog, "Onarım günlüğünü aç")
-	appendMenu(m, mfString, idDiag, "Tanılama raporu oluştur")
-	appendMenu(m, check(autostartEnabled()), idAutostart, "Windows açılışında yönetici olarak başlat")
+	adv, _, _ := pCreatePopupMenu.Call()
+	appendMenu(adv, check(learn), idLearn, "Tuş öğrenme modu")
+	appendMenu(adv, mfSeparator, 0, "")
+	appendMenu(adv, mfString, idDiag, "Tanılama raporu oluştur")
+	appendMenu(adv, mfString, idOpenLog, "Günlüğü aç")
+	appendMenu(adv, mfString, idOpenRepairLog, "Onarım günlüğünü aç")
+	appendMenu(adv, mfString, idOpenCfg, "config.json dosyasını aç")
+	appendMenu(m, mfPopup, adv, "Gelişmiş")
+	appendMenu(m, check(autostartEnabled()), idAutostart, "Windows açılışında başlat")
+	appendMenu(m, mfString, idOpenGUI, "Ayarlar…")
 	appendMenu(m, mfSeparator, 0, "")
 	appendMenu(m, mfString, idQuit, "Çıkış")
 
@@ -328,7 +372,7 @@ func showMenu() {
 
 func handleCommand(id int) {
 	switch {
-	case id == idOpenGUI:
+	case id == idOpenGUI || id == idStatus:
 		go openGUI()
 	case id == idStopAll:
 		engine.stopAll()
@@ -376,9 +420,14 @@ func handleCommand(id int) {
 			os.WriteFile(p, []byte(mgr.diagnostics()), 0644)
 			shellExecute("open", "notepad.exe", `"`+p+`"`, 1)
 		}()
+	case id == idGameMode:
+		go setGameModeEnabled(!getConfig().GameMode.Enabled)
 	case id == idAutostart:
 		go setAutostart(!autostartEnabled())
+	case id == idUpdate:
+		go applyUpdate()
 	case id == idQuit:
+		closeGUIWindow()
 		n := baseNID()
 		pShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&n)))
 		engine.stopAll()
@@ -457,6 +506,12 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 	case wmHookUpdate:
 		updateHooks()
 		return 0
+	case wmOpenGUI:
+		showGUIWindow()
+		return 0
+	case wmQuitApp:
+		handleCommand(idQuit)
+		return 0
 	case wmPowerBroadcast:
 		if wparam == 0x12 { // PBT_APMRESUMEAUTOMATIC
 			detector.onReconnect()
@@ -477,6 +532,7 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 
 func runUI() {
 	runtime.LockOSThread()
+	pCoInitializeEx.Call(0, 2) // COINIT_APARTMENTTHREADED: WebView2 needs an STA with a message loop
 	inst, _, _ := pGetModuleHandleW.Call(0)
 	cls := u16("MXHelperWnd")
 	wc := wndClassEx{WndProc: wndProcCb, Instance: inst, ClassName: cls}
@@ -484,6 +540,9 @@ func runUI() {
 	pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
 	hwnd, _, _ := pCreateWindowExW.Call(0, uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(u16("MX Helper"))), 0, 0, 0, 0, 0, 0, 0, inst, 0)
 	trayHwnd = hwnd
+	enableDarkMenus()
+	// a second, non-elevated instance may ask an elevated one to show its window
+	pChangeWindowMsgFilterEx.Call(hwnd, wmOpenGUI, 1, 0) // MSGFLT_ALLOW
 	tm, _, _ := pRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(u16("TaskbarCreated"))))
 	taskbarMsg = uint32(tm)
 	iconOn = loadIcon(iconOnData, "icon_on.ico")

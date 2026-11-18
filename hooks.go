@@ -4,6 +4,7 @@ package main
 
 import (
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -118,6 +119,9 @@ func kbHookProc(code uintptr, wparam uintptr, lparam uintptr) uintptr {
 
 // handleKey returns true to swallow the event.
 func handleKey(vk uint16, down bool) bool {
+	if gameBlocks(vk, physMods, down) {
+		return true
+	}
 	recorder.key(vk, down)
 	if b := modBit(vk); b != 0 {
 		if down {
@@ -173,7 +177,14 @@ func handleKey(vk uint16, down bool) bool {
 }
 
 func msHookProc(code uintptr, wparam uintptr, lparam uintptr) uintptr {
-	if int32(code) == 0 && wparam != 0x0200 { // skip WM_MOUSEMOVE fast
+	if int32(code) == 0 && wparam == 0x0200 { // WM_MOUSEMOVE: only the recorder cares
+		if recMoves.Load() {
+			m := *(**msLLHook)(unsafe.Pointer(&lparam))
+			if m.ExtraInfo != injectMagic {
+				recorder.move(int(m.Pt.X), int(m.Pt.Y))
+			}
+		}
+	} else if int32(code) == 0 {
 		m := *(**msLLHook)(unsafe.Pointer(&lparam))
 		if m.ExtraInfo != injectMagic {
 			if handleMouse(uint32(wparam), m.MouseData) {
@@ -291,6 +302,8 @@ type recEvent struct {
 	key  uint16
 	btn  string
 	down bool
+	move bool
+	x, y int
 }
 
 type macroRecorder struct {
@@ -298,17 +311,33 @@ type macroRecorder struct {
 	on        bool
 	withMouse bool
 	events    []recEvent
+	lastMove  time.Time
 }
 
-var recorder = &macroRecorder{}
+var (
+	recorder = &macroRecorder{}
+	recMoves atomic.Bool // fast check for the mouse hook
+)
 
 func (r *macroRecorder) active() bool { r.mu.Lock(); defer r.mu.Unlock(); return r.on }
 
-func (r *macroRecorder) start(withMouse bool) {
+func (r *macroRecorder) start(withMouse, withMoves bool) {
 	r.mu.Lock()
-	r.on, r.withMouse, r.events = true, withMouse, nil
+	r.on, r.withMouse, r.events, r.lastMove = true, withMouse, nil, time.Time{}
 	r.mu.Unlock()
+	recMoves.Store(withMoves)
 	requestHookUpdate()
+}
+
+// move samples the cursor path at most every 16 ms.
+func (r *macroRecorder) move(x, y int) {
+	now := time.Now()
+	r.mu.Lock()
+	if r.on && now.Sub(r.lastMove) >= 16*time.Millisecond {
+		r.lastMove = now
+		r.events = append(r.events, recEvent{at: now, move: true, x: x, y: y})
+	}
+	r.mu.Unlock()
 }
 
 func (r *macroRecorder) key(vk uint16, down bool) {
@@ -335,7 +364,13 @@ func (r *macroRecorder) stop(withDelays bool) []Action {
 	ev := r.events
 	r.on, r.events = false, nil
 	r.mu.Unlock()
+	recMoves.Store(false)
 	requestHookUpdate()
+
+	// trailing moves are the trip to the GUI's stop button
+	for len(ev) > 0 && (ev[len(ev)-1].move || ev[len(ev)-1].btn == "left") {
+		ev = ev[:len(ev)-1]
+	}
 
 	// drop the final left click (that was the "stop" button in the GUI)
 	for len(ev) > 0 && ev[len(ev)-1].btn == "left" {
@@ -346,6 +381,10 @@ func (r *macroRecorder) stop(withDelays bool) []Action {
 	downB := map[string]bool{}
 	var clean []recEvent
 	for _, e := range ev {
+		if e.move {
+			clean = append(clean, e)
+			continue
+		}
 		if e.btn != "" {
 			if !e.down && !downB[e.btn] {
 				continue
@@ -368,7 +407,9 @@ func (r *macroRecorder) stop(withDelays bool) []Action {
 			}
 		}
 		last = e.at
-		if e.btn != "" {
+		if e.move {
+			out = append(out, Action{Type: "move", X: e.x, Y: e.y})
+		} else if e.btn != "" {
 			t := "mouseup"
 			if e.down {
 				t = "mousedown"

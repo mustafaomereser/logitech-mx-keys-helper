@@ -24,6 +24,8 @@ func hasArg(a string) bool {
 }
 
 func main() {
+	enableDPIAwareness()
+	finishUpdate() // after a self-update: wait for the old process to release the mutex
 	r, _, err := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(u16(`Local\MXKeysHelper`))))
 	if r != 0 && err == syscall.Errno(183) { // ERROR_ALREADY_EXISTS
 		if !openRunningGUI() {
@@ -49,6 +51,8 @@ func main() {
 		go func() { time.Sleep(1500 * time.Millisecond); openGUI() }()
 	}
 	go watchConfig()
+	go watchGameMode()
+	go watchUpdates()
 	go mgr.run()
 	go func() {
 		time.Sleep(4 * time.Second)

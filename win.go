@@ -61,6 +61,10 @@ var (
 	pGetForegroundWindow     = user32.NewProc("GetForegroundWindow")
 	pGetWindowThreadProcId   = user32.NewProc("GetWindowThreadProcessId")
 	pMessageBoxW             = user32.NewProc("MessageBoxW")
+	pGetSystemMetrics        = user32.NewProc("GetSystemMetrics")
+	pFindWindowW             = user32.NewProc("FindWindowW")
+	pShowWindow              = user32.NewProc("ShowWindow")
+	pIsIconic                = user32.NewProc("IsIconic")
 
 	pShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 	pShellExecuteW    = shell32.NewProc("ShellExecuteW")

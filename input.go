@@ -152,6 +152,51 @@ func mouseUp(b string) {
 	sendInputs([]input{msInput(mouseInput{Flags: mb.up, MouseData: mb.data})})
 }
 
+const (
+	mouseeventfMove        = 0x0001
+	mouseeventfWheel       = 0x0800
+	mouseeventfHWheel      = 0x1000
+	mouseeventfVirtualDesk = 0x4000
+	mouseeventfAbsolute    = 0x8000
+)
+
+func sysMetric(i int) int32 {
+	r, _, _ := pGetSystemMetrics.Call(uintptr(i))
+	return int32(r)
+}
+
+// mouseMove moves the cursor to screen pixel (x, y), or by (x, y) when rel is set.
+func mouseMove(x, y int, rel bool) {
+	if rel {
+		sendInputs([]input{msInput(mouseInput{Dx: int32(x), Dy: int32(y), Flags: mouseeventfMove})})
+		return
+	}
+	// absolute coordinates are normalized to 0..65535 across the virtual desktop
+	vx, vy := sysMetric(76), sysMetric(77) // SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN
+	vw, vh := sysMetric(78), sysMetric(79) // SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN
+	if vw <= 1 || vh <= 1 {
+		return
+	}
+	nx := (int64(int32(x)-vx)*65535 + int64(vw-1)/2) / int64(vw-1)
+	ny := (int64(int32(y)-vy)*65535 + int64(vh-1)/2) / int64(vh-1)
+	sendInputs([]input{msInput(mouseInput{Dx: int32(nx), Dy: int32(ny), Flags: mouseeventfMove | mouseeventfAbsolute | mouseeventfVirtualDesk})})
+}
+
+// mouseScroll turns the wheel by n notches (positive = up / right).
+func mouseScroll(n int, horiz bool) {
+	fl := uint32(mouseeventfWheel)
+	if horiz {
+		fl = mouseeventfHWheel
+	}
+	sendInputs([]input{msInput(mouseInput{MouseData: uint32(int32(n * 120)), Flags: fl})})
+}
+
+func cursorPos() (int, int) {
+	var pt point
+	pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+	return int(pt.X), int(pt.Y)
+}
+
 // ---------- key names ----------
 
 var keyNames = map[string]uint16{
@@ -164,6 +209,8 @@ var keyNames = map[string]uint16{
 	"menu": 0x5D, "apps": 0x5D,
 	"mute": 0xAD, "voldown": 0xAE, "volup": 0xAF, "next": 0xB0, "prev": 0xB1, "stop": 0xB2, "playpause": 0xB3,
 	"plus": 0xBB, "minus": 0xBD, "comma": 0xBC, "period": 0xBE,
+	"browserback": 0xA6, "browserfwd": 0xA7, "browserrefresh": 0xA8, "browserhome": 0xAC,
+	"mail": 0xB4, "calc": 0xB7, "mycomputer": 0xB6,
 	"num0": 0x60, "num1": 0x61, "num2": 0x62, "num3": 0x63, "num4": 0x64, "num5": 0x65, "num6": 0x66,
 	"num7": 0x67, "num8": 0x68, "num9": 0x69, "nummul": 0x6A, "numadd": 0x6B, "numsub": 0x6D, "numdec": 0x6E, "numdiv": 0x6F,
 }
@@ -173,7 +220,8 @@ var vkNames = func() map[uint16]string {
 		"space", "backspace", "delete", "insert", "home", "end", "pgup", "pgdn", "up", "down", "left", "right", "printscreen",
 		"capslock", "numlock", "scrolllock", "pause", "menu", "mute", "voldown", "volup", "next", "prev", "stop", "playpause",
 		"plus", "minus", "comma", "period", "num0", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9",
-		"nummul", "numadd", "numsub", "numdec", "numdiv"}
+		"nummul", "numadd", "numsub", "numdec", "numdiv", "browserback", "browserfwd", "browserrefresh", "browserhome",
+		"mail", "calc", "mycomputer"}
 	m := map[uint16]string{}
 	for _, n := range pref {
 		if _, ok := m[keyNames[n]]; !ok {

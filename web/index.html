@@ -5,213 +5,272 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MX Helper</title>
 <link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:,">
+<link rel="icon" href="icon.png">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-kb" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
+    <symbol id="i-assign" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-game" viewBox="0 0 24 24"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15a3 3 0 0 0 5.4 1.8L9 15h6l1.6 1.8A3 3 0 0 0 22 15l-.7-6.4A4 4 0 0 0 17.3 5z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></symbol>
+    <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="currentColor"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+    <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><path d="M4 17l6-5-6-5M12 19h8"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 6v3M9.5 14l2.5 2.5 2.5-2.5"/></symbol>
+    <symbol id="i-app" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
+    <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 15h.01M15 9h.01M9 15h.01"/></symbol>
+  </defs>
+</svg>
+
 <aside class="side">
   <div class="brand">
-    <div class="logo" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <div>
-      <div class="brand-name">MX Helper</div>
-      <div class="brand-sub" id="ver">—</div>
-    </div>
+    <span class="logo" aria-hidden="true"><svg class="ic"><use href="#i-kb"/></svg></span>
+    <span class="brand-name">MX Helper</span>
+    <span class="brand-ver" id="ver"></span>
   </div>
+
+  <div class="device" id="devPill">
+    <span class="dot"></span>
+    <span class="device-text">
+      <b id="devText">Bağlantı bekleniyor</b>
+      <span class="device-sub"><span class="batt-ic" id="battIc"><span id="battIcFill"></span></span><span id="battTop"></span></span>
+    </span>
+  </div>
+
   <nav id="nav">
-    <button data-tab="home" class="active"><i>◉</i>Genel</button>
-    <button data-tab="macros"><i>⌘</i>Makrolar</button>
-    <button data-tab="light"><i>☀</i>Arka ışık</button>
-    <button data-tab="adv"><i>⚙</i>Gelişmiş</button>
+    <div class="nav-label">KLAVYE</div>
+    <button data-tab="home" class="active"><svg class="ic"><use href="#i-kb"/></svg>Genel bakış</button>
+    <button data-tab="macros"><svg class="ic"><use href="#i-assign"/></svg>Atamalar</button>
+    <button data-tab="light"><svg class="ic"><use href="#i-sun"/></svg>Aydınlatma</button>
+    <button data-tab="game"><svg class="ic"><use href="#i-game"/></svg>Oyun modu</button>
+    <div class="nav-label">UYGULAMA</div>
+    <button data-tab="adv"><svg class="ic"><use href="#i-gear"/></svg>Ayarlar</button>
   </nav>
+
   <div class="side-foot">
-    <div class="dev" id="devPill"><span class="dot"></span><span id="devText">Bağlantı bekleniyor</span></div>
-    <div class="batt" id="battMini"></div>
+    <button class="side-row upd" id="updSide" hidden><svg class="ic"><use href="#i-import"/></svg><span id="updSideText">Güncelleme var</span></button>
+    <button class="side-row" id="stopAllTop" hidden><svg class="ic"><use href="#i-stop"/></svg>Çalışan makroları durdur</button>
+    <button class="side-row" id="gmBtn" title="Oyun modunu aç/kapa">
+      <svg class="ic"><use href="#i-game"/></svg><span id="gmText">Oyun modu</span><span class="mini-switch"></span>
+    </button>
   </div>
 </aside>
 
 <main>
-  <!-- HOME -->
+  <!-- ============ OVERVIEW ============ -->
   <section id="tab-home" class="tab active">
     <header class="page-head">
-      <h1>Genel</h1>
-      <p>Klavye durumu ve takılma onarımı</p>
-    </header>
-
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">Klavye</div>
-        <div class="big" id="homeName">—</div>
-        <div class="muted" id="homeConn">—</div>
-        <div class="battbar"><div id="battFill"></div></div>
-        <div class="row between"><span class="muted">Pil</span><b id="battText">—</b></div>
-      </div>
-
-      <div class="card accent">
-        <div class="card-title">Takılma onarımı</div>
-        <p class="muted small">Klavye sadece ses tuşlarına yanıt veriyorsa <kbd>Mute</kbd> tuşuna <b>3 kez</b> bas ya da aşağıdaki düğmeye tıkla.</p>
-        <button class="btn primary wide" id="repairBtn">Klavyeyi şimdi onar</button>
-        <div class="row between mt">
-          <span class="muted">İşe yarayan son seviye</span><b id="repairLvl">—</b>
-        </div>
-        <div class="row between">
-          <span class="muted">Başarılı onarımlar</span><b id="repairCnt">—</b>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Onarım ayarları</div>
-      <div class="field">
-        <label>Takılmayı fark edince</label>
-        <div class="seg" id="autoSeg">
-          <button data-v="ask">Bildirimle sor</button>
-          <button data-v="auto">Sormadan onar</button>
-          <button data-v="off">Bir şey yapma</button>
-        </div>
-      </div>
-      <div class="field inline">
-        <label for="mediaN">Kaç ses tuşu basımından sonra şüphelensin</label>
-        <input type="number" id="mediaN" min="1" max="10" class="num">
-      </div>
-      <div class="field inline">
-        <label for="lowWarn">Düşük pil uyarısı (%)</label>
-        <input type="number" id="lowWarn" min="0" max="50" class="num">
-      </div>
-      <div class="row gap">
-        <button class="btn" id="saveHome">Kaydet</button>
-        <button class="btn ghost" id="resetRepair">Onarım geçmişini sıfırla</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Başlangıç</div>
-      <label class="switch-row">
-        <span>
-          <b>Windows açılışında yönetici olarak başlat</b>
-          <span class="muted small block">Onarım her seferinde yönetici izni sormaz; oyunlarda da makrolar çalışır.</span>
-        </span>
-        <span class="switch"><input type="checkbox" id="autostart"><span></span></span>
-      </label>
-      <div class="muted small" id="elevInfo"></div>
-      <div class="warn" id="logiWarn" hidden></div>
-    </div>
-  </section>
-
-  <!-- MACROS -->
-  <section id="tab-macros" class="tab">
-    <header class="page-head row between">
       <div>
-        <h1>Makrolar</h1>
-        <p>Tuş kombinasyonu, fare yan tuşu veya MX özel tuşuna bağlı makrolar</p>
+        <h1 id="homeName">MX Keys Mini</h1>
+        <p><span class="status" id="homeConn">Bağlantı bekleniyor</span></p>
       </div>
-      <div class="row gap">
-        <button class="btn ghost" id="stopAll" title="ctrl+alt+pause">Çalışanları durdur</button>
-        <div class="dropdown">
-          <button class="btn primary" id="newMacroBtn">+ Yeni makro</button>
-          <div class="menu" id="newMenu" hidden>
-            <button data-t="turboClick"><b>Turbo tık</b><span>Basılı tuttukça hızlı sol tık</span></button>
-            <button data-t="turboKey"><b>Turbo tuş</b><span>Basılı tuttukça bir tuşa bas-çek</span></button>
-            <button data-t="record"><b>Kayıtlı makro</b><span>Tuş ve tıklamalarını kaydet, tekrar oynat</span></button>
-            <button data-t="text"><b>Metin yaz</b><span>Kısayolla hazır metin</span></button>
-            <button data-t="run"><b>Program / site aç</b><span>Uygulama, klasör veya URL</span></button>
-            <button data-t="blank"><b>Boş</b><span>Sıfırdan</span></button>
-          </div>
+      <button class="btn primary" id="repairBtn"><svg class="ic sm"><use href="#i-wrench"/></svg>Klavyeyi onar</button>
+    </header>
+
+    <div class="card kb-card-home">
+      <div class="kb-wrap hero"><div class="kb" id="kbHome"></div></div>
+      <p class="card-foot muted">Klavye sadece ses tuşlarına yanıt veriyorsa <kbd>Mute</kbd> tuşuna 3 kez bas ya da “Klavyeyi onar”a tıkla.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Pil</div>
+        <div class="stat-row">
+          <div class="ring"><svg viewBox="0 0 36 36"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" id="battArc" cx="18" cy="18" r="15.5"/></svg></div>
+          <div><div class="stat-value" id="battText">—</div><div class="stat-sub" id="battSub">—</div></div>
         </div>
+      </div>
+      <button class="stat link" data-go="light">
+        <div class="stat-label">Arka ışık</div>
+        <div class="stat-value" id="tileBL">—</div>
+        <div class="lvl-bars" id="tileBLBars"></div>
+        <div class="stat-sub" id="tileBLSub">—</div>
+      </button>
+      <button class="stat link" data-go="macros">
+        <div class="stat-label">Atamalar</div>
+        <div class="stat-value" id="tileMacros">0</div>
+        <div class="stat-sub" id="tileMacrosSub">etkin makro</div>
+      </button>
+      <div class="stat">
+        <div class="stat-label">Onarım</div>
+        <div class="stat-value" id="repairCnt">0</div>
+        <div class="stat-sub" id="repairLvl">başarılı onarım</div>
+      </div>
+    </div>
+    <div class="note warn" id="logiWarn" hidden></div>
+  </section>
+
+  <!-- ============ ASSIGNMENTS ============ -->
+  <section id="tab-macros" class="tab">
+    <header class="page-head">
+      <div>
+        <h1>Atamalar</h1>
+        <p>Klavyede bir tuşa tıkla, ona ne yapacağını söyle.</p>
+      </div>
+      <div class="profile-wrap">
+        <button class="btn" id="profileBtn">
+          <svg class="ic sm"><use href="#i-app"/></svg><span id="profileName">Varsayılan</span><svg class="ic sm"><use href="#i-chev"/></svg>
+        </button>
+        <div class="menu pmenu" id="profileMenu" hidden></div>
       </div>
     </header>
 
-    <div class="macro-layout">
-      <div class="macro-list" id="macroList"></div>
-      <div class="editor card" id="editor">
-        <div class="empty" id="editorEmpty">
-          <div class="empty-icon">⌘</div>
-          <p>Soldan bir makro seç veya yeni bir tane oluştur.</p>
+    <div class="assign">
+      <aside class="card mpanel">
+        <div class="mpanel-head">
+          <div class="search"><svg class="ic sm"><use href="#i-search"/></svg><input id="mSearch" placeholder="Ara"></div>
+          <div class="dropdown">
+            <button class="btn icon-only" id="newMacroBtn" title="Yeni makro"><svg class="ic sm"><use href="#i-plus"/></svg></button>
+            <div class="menu" id="newMenu" hidden>
+              <button data-t="blank"><svg class="ic sm"><use href="#i-plus"/></svg><b>Boş makro</b><span>Eylemleri sen eklersin</span></button>
+              <button data-t="record"><svg class="ic sm"><use href="#i-rec"/></svg><b>Kaydederek</b><span>Tuş, tık ve fare hareketlerini kaydet</span></button>
+              <div class="menu-sep"></div>
+              <button data-t="turboClick"><svg class="ic sm"><use href="#i-mouse"/></svg><b>Turbo tık</b><span>Basılı tuttukça hızlı sol tık</span></button>
+              <button data-t="turboKey"><svg class="ic sm"><use href="#i-bolt"/></svg><b>Turbo tuş</b><span>Basılı tuttukça bir tuşa bas-çek</span></button>
+              <button data-t="shortcut"><svg class="ic sm"><use href="#i-kb"/></svg><b>Kısayol gönder</b><span>Bir tuş başka bir kombinasyona dönüşsün</span></button>
+              <button data-t="text"><svg class="ic sm"><use href="#i-text"/></svg><b>Metin yaz</b><span>Hazır metin, imza, e-posta</span></button>
+              <button data-t="run"><svg class="ic sm"><use href="#i-app"/></svg><b>Program ya da site aç</b><span>Uygulama, klasör veya URL</span></button>
+              <button data-t="media"><svg class="ic sm"><use href="#i-play"/></svg><b>Medya tuşu</b><span>Oynat/duraklat, sonraki, ses</span></button>
+            </div>
+          </div>
         </div>
-        <div id="editorBody" hidden>
-          <div class="row gap">
-            <input id="mName" class="title-input" placeholder="Makro adı">
-            <label class="switch" title="Etkin"><input type="checkbox" id="mEnabled"><span></span></label>
-          </div>
+        <div class="mlist" id="macroList"></div>
+        <div class="mpanel-foot">
+          <button class="btn ghost sm" id="importBtn"><svg class="ic sm"><use href="#i-import"/></svg>İçe aktar</button>
+          <button class="btn ghost sm" id="exportBtn"><svg class="ic sm"><use href="#i-export"/></svg>Dışa aktar</button>
+          <input type="file" id="importFile" accept=".json,application/json" hidden>
+        </div>
+      </aside>
 
-          <div class="field">
-            <label>Tetikleyici</label>
-            <div class="row gap">
-              <div class="trigger" id="mTriggerView">—</div>
-              <button class="btn" id="captureBtn">Yakala</button>
-              <input id="mTrigger" class="mono grow" placeholder="ör. ctrl+alt+k, f13, mouse5, mx:0x0108">
-            </div>
-            <div class="muted small">Klavye kombinasyonu, fare yan tuşları (mouse4 / mouse5 / middle) veya MX özel tuşları. Sol/sağ tık tetikleyici olamaz.</div>
-          </div>
-
-          <div class="field">
-            <label>Çalışma şekli</label>
-            <div class="seg" id="modeSeg">
-              <button data-v="press">Bir kez çalıştır</button>
-              <button data-v="hold">Basılı tuttukça tekrarla</button>
-              <button data-v="toggle">Bas başlat / bas durdur</button>
-            </div>
-          </div>
-
-          <div class="grid3">
-            <div class="field" id="fInterval">
-              <label for="mInterval">Tekrar aralığı (ms)</label>
-              <input type="number" id="mInterval" min="1" class="num">
-              <div class="muted small" id="rateHint"></div>
-            </div>
-            <div class="field" id="fRepeat">
-              <label for="mRepeat">Kaç kez</label>
-              <input type="number" id="mRepeat" min="1" class="num">
-            </div>
-            <div class="field span2">
-              <label for="mApp">Sadece bu programda</label>
-              <div class="row gap">
-                <input id="mApp" class="mono grow" placeholder="hepsi (ör. Brawlhalla.exe)">
-                <button class="btn small" id="pickApp" title="3 saniye içinde hedef pencereye geç">Seç</button>
+      <div class="acenter">
+        <div class="card kb-card">
+          <div class="kb-row">
+            <div class="kb-wrap"><div class="kb" id="kbAssign"></div></div>
+            <div class="mouse-pad">
+              <div class="mouse-body">
+                <button class="mbtn" data-trig="middle" title="Orta tuş">Orta</button>
+                <button class="mbtn" data-trig="mouse5" title="İleri yan tuş">İleri</button>
+                <button class="mbtn" data-trig="mouse4" title="Geri yan tuş">Geri</button>
               </div>
             </div>
           </div>
+          <div class="kb-foot">
+            <div class="kb-hint" id="kbHint"></div>
+            <div class="legend"><span class="lg own"></span>bu profilde<span class="lg inh"></span>varsayılandan</div>
+          </div>
+          <div class="mx-extra" id="mxExtra" hidden></div>
+        </div>
 
-          <label class="check"><input type="checkbox" id="mPass"> Tetikleyici tuş da normal işlevini yapsın</label>
-
-          <div class="field">
-            <div class="row between">
-              <label>Eylemler</label>
-              <div class="row gap">
-                <label class="check small"><input type="checkbox" id="recMouse" checked> Tıklamaları kaydet</label>
-                <label class="check small"><input type="checkbox" id="recDelays" checked> Beklemeleri kaydet</label>
-                <button class="btn small rec" id="recBtn">● Kayda başla</button>
+        <div class="card editor" id="editor">
+          <div class="empty" id="editorEmpty">
+            <svg class="ic xl"><use href="#i-assign"/></svg>
+            <p>Klavyede bir tuşa tıkla ya da soldan bir makro seç.</p>
+          </div>
+          <div id="editorBody" hidden>
+            <div class="ed-head">
+              <input id="mName" class="title-input" placeholder="Makro adı" maxlength="80">
+              <div class="ed-actions">
+                <label class="switch" title="Etkin"><input type="checkbox" id="mEnabled"><span></span></label>
+                <span class="vsep"></span>
+                <button class="icon-btn" id="undoBtn" title="Geri al (Ctrl+Z)"><svg class="ic sm"><use href="#i-undo"/></svg></button>
+                <button class="icon-btn" id="dupMacro" title="Çoğalt"><svg class="ic sm"><use href="#i-copy"/></svg></button>
+                <button class="icon-btn danger" id="delMacro" title="Sil"><svg class="ic sm"><use href="#i-trash"/></svg></button>
+                <button class="btn" id="testMacro" title="2 saniye sonra bir kez çalışır"><svg class="ic sm"><use href="#i-play"/></svg>Dene</button>
+                <button class="btn primary" id="saveMacro">Kaydet</button>
               </div>
             </div>
+
+            <div class="rows">
+              <div class="row-item">
+                <div class="row-label">Tetikleyici<small>Makroyu başlatan tuş</small></div>
+                <div class="row-ctl">
+                  <div class="trig-row">
+                    <div class="trigger" id="mTriggerView"></div>
+                    <button class="btn sm" id="captureBtn">Yakala</button>
+                    <button class="btn sm ghost" id="pickKeyBtn" title="Yukarıdaki klavyeden bir tuşa tıkla">Klavyeden seç</button>
+                  </div>
+                  <div class="conflict" id="conflict" hidden></div>
+                  <details class="raw-trig"><summary>Elle yaz</summary>
+                    <input id="mTrigger" class="mono" placeholder="ör. ctrl+alt+k, f13, mouse5, mx:0x0108">
+                  </details>
+                </div>
+              </div>
+              <div class="row-item">
+                <div class="row-label">Profil<small>Hangi programda çalışsın</small></div>
+                <div class="row-ctl"><select id="mApp"></select></div>
+              </div>
+              <div class="row-item">
+                <div class="row-label">Çalışma şekli</div>
+                <div class="row-ctl">
+                  <div class="seg" id="modeSeg">
+                    <button data-v="press" title="Basınca eylemleri bir kez (ya da N kez) çalıştırır">Bir kez</button>
+                    <button data-v="hold" title="Bırakana kadar tekrarlar">Basılı tuttukça</button>
+                    <button data-v="toggle" title="Bir bas başlar, tekrar bas durur">Aç / kapa</button>
+                  </div>
+                  <div class="opts">
+                    <label class="opt" id="fRepeat">Kaç kez <input type="number" id="mRepeat" min="1" max="9999" class="num"></label>
+                    <label class="opt" id="fInterval">Tekrar arası <span class="unit"><input type="number" id="mInterval" min="1" class="num"><span>ms</span></span><span class="rate" id="rateHint"></span></label>
+                    <label class="opt check"><input type="checkbox" id="mPass"> Tuş normal işini de yapsın</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="seq-head">
+              <div class="seq-title">Eylemler <span class="count" id="actCount"></span><span class="dur" id="actDur"></span></div>
+              <div class="seq-tools">
+                <div class="dropdown">
+                  <button class="btn ghost sm" id="delayToolBtn"><svg class="ic sm"><use href="#i-clock"/></svg>Beklemeler</button>
+                  <div class="menu small" id="delayMenu" hidden>
+                    <button data-d="set">Hepsini sabit bir değere ayarla…</button>
+                    <button data-d="scale">Hızlandır / yavaşlat…</button>
+                    <button data-d="jitter">Rastgelelik ekle…</button>
+                    <button data-d="remove">Tüm beklemeleri sil</button>
+                    <button data-d="moves">Fare hareketlerini sil</button>
+                  </div>
+                </div>
+                <button class="btn ghost sm" id="clearActions"><svg class="ic sm"><use href="#i-trash"/></svg>Temizle</button>
+                <div class="rec-group">
+                  <button class="btn sm" id="recBtn" title="Tuş, tık ve fare hareketlerini kaydet"><svg class="ic sm rec-ic"><use href="#i-rec"/></svg>Kayıt al</button>
+                  <div class="dropdown">
+                    <button class="btn sm icon-only" id="recOptBtn" title="Kayıt seçenekleri"><svg class="ic sm"><use href="#i-chev"/></svg></button>
+                    <div class="menu small" id="recMenu" hidden>
+                      <label class="check"><input type="checkbox" id="recMouse" checked> Tıklamaları kaydet</label>
+                      <label class="check"><input type="checkbox" id="recMoves"> Fare hareketini kaydet</label>
+                      <label class="check"><input type="checkbox" id="recDelays" checked> Beklemeleri kaydet</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div id="actions" class="actions"></div>
-            <div class="row gap">
-              <select id="addType" class="sel">
-                <option value="click">Fare tıkla</option>
-                <option value="keys">Tuşa bas (kombinasyon)</option>
-                <option value="keydown">Tuşu basılı tut</option>
-                <option value="keyup">Tuşu bırak</option>
-                <option value="mousedown">Fare tuşunu basılı tut</option>
-                <option value="mouseup">Fare tuşunu bırak</option>
-                <option value="delay">Bekle</option>
-                <option value="text">Metin yaz</option>
-                <option value="run">Program / dosya aç</option>
-                <option value="url">Web adresi aç</option>
-                <option value="shell">Komut çalıştır</option>
-                <option value="http">HTTP isteği</option>
-                <option value="backlight">Arka ışık</option>
-                <option value="repair">Klavyeyi onar</option>
-              </select>
-              <button class="btn" id="addAction">+ Ekle</button>
-              <button class="btn ghost" id="clearActions">Temizle</button>
-            </div>
-          </div>
-
-          <div class="editor-foot row between">
-            <div class="row gap">
-              <button class="btn ghost danger" id="delMacro">Sil</button>
-              <button class="btn ghost" id="dupMacro">Çoğalt</button>
-            </div>
-            <div class="row gap">
-              <button class="btn" id="testMacro" title="2 saniye sonra bir kez çalışır">Dene</button>
-              <button class="btn primary" id="saveMacro">Kaydet</button>
+            <div class="dropdown add-wrap">
+              <button class="btn add-btn" id="addActBtn"><svg class="ic sm"><use href="#i-plus"/></svg>Eylem ekle</button>
+              <div class="menu palette" id="palette" hidden></div>
             </div>
           </div>
         </div>
@@ -219,115 +278,158 @@
     </div>
   </section>
 
-  <!-- LIGHT -->
+  <!-- ============ LIGHTING ============ -->
   <section id="tab-light" class="tab">
     <header class="page-head">
-      <h1>Arka ışık</h1>
-      <p>Anlık ayar ve otomatik kurallar</p>
+      <div><h1>Aydınlatma</h1><p>Arka ışığı şimdi ayarla ya da saate ve programa göre kurallar koy.</p></div>
+      <button class="btn" id="blRules">Kurallara dön</button>
     </header>
-    <div class="card">
-      <div class="card-title">Şimdi</div>
-      <div class="seg" id="blSeg">
-        <button data-v="auto">Otomatik</button>
-        <button data-v="manual">Manuel</button>
-        <button data-v="off">Kapalı</button>
-      </div>
-      <div class="field mt">
-        <label>Seviye <b id="blLvlText">—</b></label>
-        <input type="range" id="blLevel" min="0" max="7" step="1">
-      </div>
-      <div class="row between">
-        <span class="muted small" id="blInfo">—</span>
-        <button class="btn ghost small" id="blRules">Kurallara dön</button>
+
+    <div class="card light-card">
+      <div class="kb-wrap"><div class="kb" id="kbLight"></div></div>
+      <div class="rows">
+        <div class="row-item">
+          <div class="row-label">Mod<small id="blInfo">—</small></div>
+          <div class="row-ctl right">
+            <div class="seg" id="blSeg">
+              <button data-v="auto">Otomatik</button>
+              <button data-v="manual">Manuel</button>
+              <button data-v="off">Kapalı</button>
+            </div>
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Parlaklık<small id="blLvlText"></small></div>
+          <div class="row-ctl right"><div class="lvl-picker" id="blPicker"></div></div>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Kurallar <span class="muted small">— yukarıdan aşağıya, uyan ilk kural uygulanır</span></div>
-      <table class="rules">
-        <thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Programlar</th><th>Mod</th><th>Seviye</th><th></th></tr></thead>
-        <tbody id="rulesBody"></tbody>
-      </table>
-      <button class="btn small" id="addRule">+ Kural ekle</button>
-      <div class="grid3 mt">
-        <div class="field">
-          <label>Hiçbir kural uymazsa</label>
-          <select id="blDefault" class="sel">
-            <option value="leave">Dokunma</option>
-            <option value="auto">Otomatik</option>
-            <option value="manual">Manuel</option>
-            <option value="off">Kapalı</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="blDefaultLevel">Varsayılan seviye</label>
-          <input type="number" id="blDefaultLevel" min="0" class="num">
-        </div>
-        <div class="field">
-          <label for="blLowOff">Pil şu yüzdenin altındaysa kapat</label>
-          <input type="number" id="blLowOff" min="0" max="100" class="num">
-        </div>
+      <div class="card-head"><div><h2>Kurallar</h2><p>Yukarıdan aşağıya; uyan ilk kural uygulanır.</p></div><button class="btn sm" id="addRule"><svg class="ic sm"><use href="#i-plus"/></svg>Kural ekle</button></div>
+      <div class="rules" id="rulesBody"></div>
+      <div class="rows">
+        <div class="row-item"><div class="row-label">Hiçbir kural uymazsa</div><div class="row-ctl right"><select id="blDefault" class="w-180"><option value="leave">Dokunma</option><option value="auto">Otomatik</option><option value="manual">Manuel</option><option value="off">Kapalı</option></select></div></div>
+        <div class="row-item"><div class="row-label">Varsayılan seviye</div><div class="row-ctl right"><input type="number" id="blDefaultLevel" min="0" class="num"></div></div>
+        <div class="row-item"><div class="row-label">Pil azalınca kapat<small>Bu yüzdenin altında ışık kapanır</small></div><div class="row-ctl right"><span class="unit"><input type="number" id="blLowOff" min="0" max="100" class="num"><span>%</span></span></div></div>
+        <div class="row-item"><div class="row-label">Eller uzaktayken sönme<small>0 = klavyedeki değere dokunma</small></div><div class="row-ctl right"><span class="unit"><input type="number" id="dOut" min="0" step="5" class="num"><span>sn</span></span></div></div>
+        <div class="row-item"><div class="row-label">Eller klavyedeyken sönme</div><div class="row-ctl right"><span class="unit"><input type="number" id="dIn" min="0" step="5" class="num"><span>sn</span></span></div></div>
+        <div class="row-item"><div class="row-label">Şarjdayken sönme</div><div class="row-ctl right"><span class="unit"><input type="number" id="dPow" min="0" step="5" class="num"><span>sn</span></span></div></div>
       </div>
-      <details class="mt">
-        <summary>Sönme süreleri</summary>
-        <div class="grid3">
-          <div class="field"><label for="dOut">Eller uzaktayken (sn)</label><input type="number" id="dOut" min="0" step="5" class="num"></div>
-          <div class="field"><label for="dIn">Eller klavyedeyken (sn)</label><input type="number" id="dIn" min="0" step="5" class="num"></div>
-          <div class="field"><label for="dPow">Şarjdayken (sn)</label><input type="number" id="dPow" min="0" step="5" class="num"></div>
-        </div>
-        <div class="muted small">0 = klavyedeki mevcut değere dokunma.</div>
-      </details>
-      <div class="row mt"><button class="btn primary" id="saveLight">Kaydet</button></div>
+      <div class="card-actions"><button class="btn primary" id="saveLight">Kaydet</button></div>
     </div>
   </section>
 
-  <!-- ADVANCED -->
-  <section id="tab-adv" class="tab">
+  <!-- ============ GAME MODE ============ -->
+  <section id="tab-game" class="tab">
     <header class="page-head">
-      <h1>Gelişmiş</h1>
-      <p>Cihaz eşleşmesi, ham ayar dosyası, tanılama</p>
+      <div><h1>Oyun modu</h1><p>Oyunun ortasında masaüstüne atan tuşları kilitler.</p></div>
     </header>
-    <div class="card">
-      <div class="grid3">
-        <div class="field"><label for="aName">Cihaz adı içerir</label><input id="aName" class="mono"></div>
-        <div class="field"><label for="aPid">Cihaz PID (boş = otomatik)</label><input id="aPid" class="mono" placeholder="b369"></div>
-        <div class="field"><label for="aPoll">Yoklama aralığı (sn)</label><input type="number" id="aPoll" min="3" class="num"></div>
+    <div class="card game-hero" id="gameHero">
+      <span class="game-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+      <div class="grow">
+        <div class="game-state" id="gameState">Kapalı</div>
+        <div class="muted small" id="gameReason"></div>
       </div>
-      <div class="field">
-        <label>Tüm makroları durduran kısayol</label>
-        <div class="row gap"><input id="aStop" class="mono grow"><button class="btn" id="aStopCap">Yakala</button></div>
-      </div>
-      <button class="btn primary" id="saveAdv">Kaydet</button>
+      <label class="switch" title="Elle aç/kapa"><input type="checkbox" id="gmManual"><span></span></label>
     </div>
     <div class="card">
-      <div class="card-title row between"><span>config.json</span>
-        <span class="row gap"><button class="btn small" id="rawLoad">Yenile</button><button class="btn small primary" id="rawSave">Kaydet</button></span></div>
-      <textarea id="raw" class="code" spellcheck="false"></textarea>
+      <div class="card-head"><div><h2>Kilitlenecek tuşlar</h2></div></div>
+      <div class="rows">
+        <label class="row-item click"><div class="row-label">Windows tuşu<small>Başlat menüsü açılmasın</small></div><div class="row-ctl right"><input type="checkbox" id="gmWin"></div></label>
+        <label class="row-item click"><div class="row-label">Alt + Tab<small>Pencere değiştirme</small></div><div class="row-ctl right"><input type="checkbox" id="gmAltTab"></div></label>
+        <label class="row-item click"><div class="row-label">Alt + F4<small>Oyunu yanlışlıkla kapatma</small></div><div class="row-ctl right"><input type="checkbox" id="gmAltF4"></div></label>
+      </div>
     </div>
     <div class="card">
-      <div class="card-title row between"><span>Tanılama ve günlükler</span>
-        <span class="row gap">
-          <button class="btn small" id="diagBtn">Tanılama raporu</button>
-          <button class="btn small" id="logBtn">Günlük</button>
-          <button class="btn small" id="rlogBtn">Onarım günlüğü</button>
-          <button class="btn small ghost" id="copyOut">Kopyala</button>
-        </span></div>
+      <div class="card-head"><div><h2>Otomatik aç</h2><p>Bu programlardan biri öndeyken oyun modu kendiliğinden açılır, çıkınca kapanır.</p></div><button class="btn sm" id="gmAddApp"><svg class="ic sm"><use href="#i-plus"/></svg>Program ekle</button></div>
+      <div class="chips" id="gmApps"></div>
+      <div class="card-actions"><span class="muted small">Kısayolla aç/kapa için bir makroya “Oyun modu” eylemi ekleyebilirsin.</span><button class="btn primary" id="saveGame">Kaydet</button></div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="tab-adv" class="tab">
+    <header class="page-head"><div><h1>Ayarlar</h1><p>Onarım, başlangıç, cihaz eşleşmesi ve tanılama.</p></div></header>
+
+    <div class="card">
+      <div class="card-head"><div><h2>Takılma onarımı</h2><p>Klavye sadece medya tuşlarına yanıt verdiğinde ne olsun.</p></div></div>
+      <div class="rows">
+        <div class="row-item"><div class="row-label">Takılmayı fark edince</div><div class="row-ctl right"><div class="seg" id="autoSeg"><button data-v="ask">Bildirimle sor</button><button data-v="auto">Sormadan onar</button><button data-v="off">Bir şey yapma</button></div></div></div>
+        <div class="row-item"><div class="row-label">Şüphelenme eşiği<small>Arka arkaya kaç ses tuşu basımından sonra</small></div><div class="row-ctl right"><input type="number" id="mediaN" min="1" max="10" class="num"></div></div>
+        <div class="row-item"><div class="row-label">Düşük pil uyarısı</div><div class="row-ctl right"><span class="unit"><input type="number" id="lowWarn" min="0" max="50" class="num"><span>%</span></span></div></div>
+      </div>
+      <div class="card-actions"><button class="btn ghost" id="resetRepair">Onarım geçmişini sıfırla</button><button class="btn primary" id="saveHome">Kaydet</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h2>Başlangıç</h2></div></div>
+      <div class="rows">
+        <label class="row-item click"><div class="row-label">Windows açılışında yönetici olarak başlat<small>Onarım her seferinde izin sormaz; oyunlarda da makrolar çalışır.</small></div><div class="row-ctl right"><span class="switch"><input type="checkbox" id="autostart"><span></span></span></div></label>
+      </div>
+      <div class="card-actions"><span class="muted small" id="elevInfo"></span></div>
+    </div>
+
+    <div class="card" id="updCard">
+      <div class="card-head"><div><h2>Güncellemeler</h2><p>Yeni sürümler GitHub’dan gelir; özeti doğrulanmadan yüklenmez.</p></div></div>
+      <div class="rows">
+        <div class="row-item"><div class="row-label">Yüklü sürüm</div><div class="row-ctl right"><span class="mono" id="updCur">—</span></div></div>
+        <div class="row-item"><div class="row-label">Son sürüm<small id="updState"></small></div><div class="row-ctl right"><span class="mono" id="updLatest">—</span></div></div>
+        <div class="row-item"><div class="row-label">Yeni sürüm çıkınca</div><div class="row-ctl right"><div class="seg" id="updSeg"><button data-v="auto">Otomatik yükle</button><button data-v="ask">Bildirimle sor</button><button data-v="off">Kapalı</button></div></div></div>
+      </div>
+      <div class="card-actions">
+        <button class="btn ghost" id="updNotes">Sürüm notları</button>
+        <button class="btn" id="updCheck">Şimdi kontrol et</button>
+        <button class="btn primary" id="updApply" hidden>Güncelle</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h2>Cihaz</h2><p>Hangi klavyeye bağlanılacağı.</p></div></div>
+      <div class="rows">
+        <div class="row-item"><div class="row-label">Cihaz adı içerir</div><div class="row-ctl right"><input id="aName" class="mono w-180"></div></div>
+        <div class="row-item"><div class="row-label">Cihaz PID<small>Boş bırakırsan otomatik</small></div><div class="row-ctl right"><input id="aPid" class="mono w-180" placeholder="b369"></div></div>
+        <div class="row-item"><div class="row-label">Yoklama aralığı</div><div class="row-ctl right"><span class="unit"><input type="number" id="aPoll" min="3" class="num"><span>sn</span></span></div></div>
+        <div class="row-item"><div class="row-label">Tüm makroları durduran kısayol</div><div class="row-ctl right"><div class="trig-row"><input id="aStop" class="mono w-180"><button class="btn sm" id="aStopCap">Yakala</button></div></div></div>
+      </div>
+      <div class="card-actions"><button class="btn primary" id="saveAdv">Kaydet</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h2>Tanılama ve günlükler</h2><p>Bir sorun bildirirken bunları paylaş.</p></div>
+        <div class="row gap"><button class="btn sm" id="diagBtn">Tanılama raporu</button><button class="btn sm" id="logBtn">Günlük</button><button class="btn sm" id="rlogBtn">Onarım günlüğü</button><button class="icon-btn" id="copyOut" title="Kopyala"><svg class="ic sm"><use href="#i-copy"/></svg></button></div>
+      </div>
       <pre id="out" class="code out">—</pre>
     </div>
+
+    <details class="card">
+      <summary class="card-head"><div><h2>config.json</h2><p>Uzmanlar için ham ayar dosyası.</p></div></summary>
+      <textarea id="raw" class="code" spellcheck="false"></textarea>
+      <div class="card-actions"><button class="btn ghost" id="rawLoad">Yenile</button><button class="btn primary" id="rawSave">Kaydet</button></div>
+    </details>
   </section>
 </main>
 
 <div class="overlay" id="overlay" hidden>
-  <div class="dialog">
-    <div class="pulse"></div>
+  <div class="dialog center">
+    <div class="pulse"><svg class="ic"><use href="#i-kb"/></svg></div>
     <h2 id="ovTitle">Bir tuşa bas</h2>
     <p id="ovText" class="muted"></p>
     <button class="btn" id="ovCancel">Vazgeç</button>
   </div>
 </div>
+
+<div class="overlay" id="modal" hidden>
+  <div class="dialog">
+    <h2 id="mdTitle"></h2>
+    <div id="mdBody"></div>
+    <div class="dialog-foot"></div>
+  </div>
+</div>
+
 <div class="recbar" id="recbar" hidden>
-  <span class="recdot"></span> Kaydediliyor… <span id="recTime">0.0 sn</span>
-  <button class="btn small primary" id="recStop">Durdur</button>
+  <span class="recdot"></span> Kaydediliyor <span id="recTime" class="mono">0.0 sn</span>
+  <button class="btn sm primary" id="recStop">Durdur</button>
 </div>
 <div class="toast" id="toast" hidden></div>
 

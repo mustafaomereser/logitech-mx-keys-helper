@@ -3,6 +3,7 @@
 package main
 
 import (
+	"math/rand/v2"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -45,7 +46,7 @@ func (e *macroEngine) rebuild() {
 	}
 	e.mu.Lock()
 	e.byTrigger = by
-	e.needKB = needKB || len(by) > 0 // keyboard hook also serves the stop-all combo
+	e.needKB = needKB || len(by) > 0 || c.GameMode.configured() // keyboard hook also serves the stop-all combo and game mode
 	e.needMouse = needMouse
 	e.stopCombo = normalizeTrigger(c.StopCombo)
 	e.mu.Unlock()
@@ -283,13 +284,26 @@ func (r *runner) do(a Action) {
 		}
 	case "click":
 		b := normButton(a.Button)
-		mouseDown(b)
-		r.buttons[b] = true
-		if a.HoldMs > 0 {
-			r.sleep(a.HoldMs)
+		n := a.Count
+		if n < 1 {
+			n = 1
 		}
-		mouseUp(b)
-		delete(r.buttons, b)
+		for i := 0; i < n && !r.stopped(); i++ {
+			if i > 0 {
+				r.sleep(30)
+			}
+			mouseDown(b)
+			r.buttons[b] = true
+			if a.HoldMs > 0 {
+				r.sleep(a.HoldMs)
+			}
+			mouseUp(b)
+			delete(r.buttons, b)
+		}
+	case "move":
+		mouseMove(a.X, a.Y, a.Rel)
+	case "scroll":
+		mouseScroll(a.Amount, a.Horiz)
 	case "mousedown":
 		b := normButton(a.Button)
 		mouseDown(b)
@@ -299,7 +313,7 @@ func (r *runner) do(a Action) {
 		mouseUp(b)
 		delete(r.buttons, b)
 	case "delay":
-		r.sleep(a.Ms)
+		r.sleep(delayMs(a))
 	default:
 		runSimpleAction(a)
 	}
@@ -312,7 +326,20 @@ func runSimpleAction(a Action) {
 	case "keys":
 		sendKeys(parseCombo(a.Keys))
 	case "delay":
-		time.Sleep(time.Duration(a.Ms) * time.Millisecond)
+		time.Sleep(time.Duration(delayMs(a)) * time.Millisecond)
+	case "move":
+		mouseMove(a.X, a.Y, a.Rel)
+	case "scroll":
+		mouseScroll(a.Amount, a.Horiz)
+	case "gamemode":
+		switch strings.ToLower(a.Value) {
+		case "on":
+			setGameModeEnabled(true)
+		case "off":
+			setGameModeEnabled(false)
+		default:
+			setGameModeEnabled(!getConfig().GameMode.Enabled)
+		}
 	case "run":
 		if err := shellExecute("open", a.Cmd, a.Args, 1); err != nil {
 			logf("Çalıştırılamadı %q: %v", a.Cmd, err)
@@ -371,6 +398,14 @@ func runSimpleAction(a Action) {
 	default:
 		logf("Bilinmeyen eylem türü: %q", a.Type)
 	}
+}
+
+// delayMs returns the wait for a delay action; ms_max > ms picks a random value in between.
+func delayMs(a Action) int {
+	if a.MsMax > a.Ms {
+		return a.Ms + rand.IntN(a.MsMax-a.Ms+1)
+	}
+	return a.Ms
 }
 
 // testMacro runs a macro once (loop modes run for 2 seconds) after a short delay.

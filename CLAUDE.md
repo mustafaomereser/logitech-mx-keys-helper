@@ -10,8 +10,7 @@ A Windows tray helper for the Logitech MX Keys Mini (Bluetooth LE). Go, standard
 
 ## Status
 
-- The repo has one commit (`8fe04cf MX Helper v0.2.0`) and the tag `v0.2.0`. **It has not been pushed to GitHub yet.** The plan is a public repo named `mxhelper`:
-  `gh repo create mxhelper --public --source . --push && git push origin v0.2.0`
+- Pushed to the public repo https://github.com/mustafaomereser/logitech-mx-keys-helper (branch `main`, tag `v0.2.0`).
 - **Nothing has been tested on real hardware.** Only the GUI was tested in a headless browser against a mock backend. The first things to verify on the device:
   1. The HID++ channel is found: Logitech VID 046D, usage page ≥ 0xFF00, 20-byte output report, product name contains "MX Keys". MX Keys Mini's BLE PID is assumed to be `b369`.
   2. **Backlight2 (0x1982) byte layout.** It was taken from Solaar: `enabled, options(mode in bits 3-4), supported, effects(LE16), level, dho, dhi, dpow (LE16, units of 5 s)`. Mode values: 1 = auto, 3 = manual. Level count comes from function 2. Set = function 1, which round-trips the bytes it read. Verify all of this against the "Tanılama raporu" output.
@@ -39,7 +38,12 @@ Working hypothesis: on reconnect, Windows fails to re-subscribe to the GATT noti
 | `macro.go` | Macro engine: modes `press` / `hold` / `toggle`, per-app macros, a runner with release-on-stop, the action implementations, the MX diverted-key queue |
 | `config.go` | Config schema (v2: `macros` is an array), migration from v1 (map of CID → rules), save/reload, log, state |
 | `api.go` | GUI HTTP server on 127.0.0.1:random; token → HttpOnly SameSite cookie; Host/Origin checks; opens an Edge `--app` window (when elevated, launches Edge de-elevated through explorer + a .vbs) |
+| `gamemode.go` | Game mode: watcher goroutine sets an atomic flag (manual or foreground app in list); `gameBlocks` is called first in the keyboard hook |
+| `trayicon.go` | Battery tray icon / menu bitmap drawn in code (SDF anti-aliased canvas → DIB → CreateIconIndirect), taskbar/app theme from the registry, dark popup menus via uxtheme ordinals 135/136 |
+| `webview.go` | GUI window: own top-level window hosting WebView2 via raw COM vtables (runtime's EmbeddedBrowserWebView.dll → CreateWebViewEnvironmentWithOptionsInternal). UI thread is STA; opened through `wmOpenGUI`. Falls back to Edge `--app` (`openGUIOnce`). Process is per-monitor-v2 DPI aware |
+| `update.go` | Self-update from GitHub releases (`releases/latest`): needs the `MXHelper.exe` asset and a SHA-256 (asset `digest` or `MXHelper.exe.sha256` from CI); renames the running exe to `.old`, starts the new one with `--after-update <pid>`, quits. Dev builds never self-update |
 | `tray.go` | Hidden window, tray icon (version 4), right-click menu, balloon notifications, message loop |
+| `tools/genicon` | Stdlib-only generator: draws the app icon, writes `assets/app.ico`, `web/icon.png` and `rsrc_windows_amd64.syso` (COFF .rsrc, linked automatically). Re-run `go run ./tools/genicon` after changing the design; the outputs are committed |
 | `web/` | Embedded GUI (vanilla HTML/CSS/JS, Turkish) |
 
 Runtime data lives in `%APPDATA%\MXHelper\`: `config.json`, `state.json`, `log.txt`, `repair.log`, `gui.url`, `tanilama.txt`.
@@ -56,6 +60,5 @@ Runtime data lives in `%APPDATA%\MXHelper\`: `config.json`, `state.json`, `log.t
 ## Possible next steps
 
 - Hardware verification using the "Tanılama raporu" output, then fix CIDs and backlight details.
-- An exe icon resource (.syso). The tray icons are already embedded.
 - Turbo for left/right click as a trigger: blocked on purpose to avoid locking the user out; could be offered as an opt-in.
 - Mouse-movement recording, macro import/export, multiple device profiles.

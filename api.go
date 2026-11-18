@@ -15,10 +15,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf16"
+	"unsafe"
 )
 
 //go:embed web
@@ -143,9 +146,10 @@ func startGUIServer() error {
 	api("POST /api/record/start", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Mouse bool `json:"mouse"`
+			Moves bool `json:"moves"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
-		recorder.start(req.Mouse)
+		recorder.start(req.Mouse, req.Mouse && req.Moves)
 		writeJSON(w, map[string]any{"ok": true})
 	})
 	api("POST /api/record/stop", func(w http.ResponseWriter, r *http.Request) {
@@ -183,12 +187,54 @@ func startGUIServer() error {
 			CID        string `json:"cid"`
 			Name       string `json:"name"`
 			Divertable bool   `json:"divertable"`
+			Pos        int    `json:"pos"` // F-key position (1..12), 0 = none
 		}
-		var out []item
+		out := []item{}
 		for _, c := range ctrls {
-			out = append(out, item{"mx:0x" + strings.ToLower(hex4(c.CID)), cidName(c.CID), c.Divertable()})
+			out = append(out, item{"mx:0x" + strings.ToLower(hex4(c.CID)), cidName(c.CID), c.Divertable(), int(c.Pos)})
 		}
 		writeJSON(w, out)
+	})
+	api("GET /api/processes", func(w http.ResponseWriter, r *http.Request) {
+		seen := map[string]bool{}
+		out := []string{}
+		for _, p := range runningProcesses() {
+			lp := strings.ToLower(p)
+			if !strings.HasSuffix(lp, ".exe") || seen[lp] || systemProcess[lp] {
+				continue
+			}
+			seen[lp] = true
+			out = append(out, p)
+		}
+		sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i]) < strings.ToLower(out[j]) })
+		writeJSON(w, out)
+	})
+	api("GET /api/cursor", func(w http.ResponseWriter, r *http.Request) {
+		d, _ := strconv.Atoi(r.URL.Query().Get("delay"))
+		if d > 0 && d <= 10 {
+			time.Sleep(time.Duration(d) * time.Second)
+		}
+		x, y := cursorPos()
+		writeJSON(w, map[string]any{"x": x, "y": y})
+	})
+	api("GET /api/update", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, updateSnapshot()) })
+	api("POST /api/update/check", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, checkUpdate()) })
+	api("POST /api/update/apply", func(w http.ResponseWriter, r *http.Request) {
+		go applyUpdate()
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	api("POST /api/update/notes", func(w http.ResponseWriter, r *http.Request) {
+		openReleasePage()
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	api("POST /api/gamemode", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			On bool `json:"on"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		setGameModeEnabled(req.On)
+		time.Sleep(800 * time.Millisecond) // let the watcher pick it up
+		apiState(w, r)
 	})
 	api("GET /api/diag", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -214,6 +260,20 @@ func startGUIServer() error {
 	go srv.Serve(ln)
 	logf("Arayüz: http://%s", guiAddr)
 	return nil
+}
+
+// systemProcess hides Windows background processes from the app picker.
+var systemProcess = map[string]bool{
+	"svchost.exe": true, "csrss.exe": true, "wininit.exe": true, "winlogon.exe": true, "services.exe": true,
+	"lsass.exe": true, "smss.exe": true, "dwm.exe": true, "fontdrvhost.exe": true, "conhost.exe": true,
+	"runtimebroker.exe": true, "sihost.exe": true, "taskhostw.exe": true, "ctfmon.exe": true, "dllhost.exe": true,
+	"searchindexer.exe": true, "searchhost.exe": true, "startmenuexperiencehost.exe": true, "shellexperiencehost.exe": true,
+	"textinputhost.exe": true, "securityhealthservice.exe": true, "spoolsv.exe": true, "wmiprvse.exe": true,
+	"audiodg.exe": true, "registry": true, "system": true, "memory compression": true, "msmpeng.exe": true,
+	"nissrv.exe": true, "lsaiso.exe": true, "wudfhost.exe": true, "mxhelper.exe": true, "applicationframehost.exe": true,
+	"backgroundtaskhost.exe": true, "smartscreen.exe": true, "useroobebroker.exe": true, "widgetservice.exe": true,
+	"crossdeviceservice.exe": true, "searchprotocolhost.exe": true, "searchfilterhost.exe": true, "sgrmbroker.exe": true,
+	"securityhealthsystray.exe": true, "unsecapp.exe": true, "dashost.exe": true, "msedgewebview2.exe": true,
 }
 
 func hex4(v uint16) string {
@@ -282,6 +342,9 @@ type apiStateResp struct {
 	Running    []string       `json:"running"`
 	LogiApps   []string       `json:"logi_apps"`
 	OverrideBL bool           `json:"backlight_override"`
+	GameMode   bool           `json:"game_mode"`
+	GameReason string         `json:"game_mode_reason"`
+	Update     updateInfo     `json:"update"`
 }
 
 var autostartCache struct {
@@ -305,7 +368,9 @@ func apiState(w http.ResponseWriter, r *http.Request) {
 	mgr.mu.Lock()
 	ov := mgr.blOverride != nil
 	mgr.mu.Unlock()
+	gm, gr := gameModeActive()
 	writeJSON(w, apiStateResp{
+		GameMode: gm, GameReason: gr, Update: updateSnapshot(),
 		Version: version, Connected: conn, Name: name, Battery: b,
 		Backlight: map[string]any{"known": blKnown, "enabled": bl.Enabled != 0, "mode": bl.Mode(), "level": bl.Level, "levels": bl.Levels},
 		Elevated:  isElevated(), Autostart: autostartCache.on,
@@ -378,19 +443,71 @@ func openURLWindow(url string) {
 	}
 }
 
+// guiWindow finds the open GUI window: Edge --app windows use the Chromium
+// window class and the page <title> ("MX Helper"). Our own hidden tray window
+// has the same title but a different class, so it never matches.
+func guiWindow() uintptr {
+	h, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16("Chrome_WidgetWin_1"))), uintptr(unsafe.Pointer(u16("MX Helper"))))
+	return h
+}
+
+// focusGUIWindow brings an already open GUI window to the front. Returns false if none is open.
+func focusGUIWindow() bool {
+	h := guiWindow()
+	if h == 0 {
+		return false
+	}
+	if r, _, _ := pIsIconic.Call(h); r != 0 {
+		pShowWindow.Call(h, 9) // SW_RESTORE
+	}
+	pSetForegroundWindow.Call(h)
+	return true
+}
+
+var guiOpen struct {
+	sync.Mutex
+	last time.Time
+}
+
+// openGUIOnce opens the GUI unless it is already open (then it is focused) or
+// was launched moments ago and has not shown its window yet.
+func openGUIOnce(url string) {
+	guiOpen.Lock()
+	defer guiOpen.Unlock()
+	if focusGUIWindow() {
+		return
+	}
+	if time.Since(guiOpen.last) < 5*time.Second {
+		return // Edge is still starting; repeated tray clicks must not open more windows
+	}
+	guiOpen.last = time.Now()
+	openURLWindow(url)
+}
+
+// openGUI shows the GUI window (our own WebView2 window; Edge as fallback).
+// Safe to call from any goroutine: the window lives on the UI thread.
 func openGUI() {
 	if guiAddr == "" {
 		return
 	}
-	openURLWindow(guiURL())
+	if trayHwnd != 0 {
+		pPostMessageW.Call(trayHwnd, wmOpenGUI, 0, 0)
+		return
+	}
+	openGUIOnce(guiURL())
 }
 
 // openRunningGUI is used by a second instance to show the first one's window.
 func openRunningGUI() bool {
+	if h, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16("MXHelperWnd"))), 0); h != 0 {
+		pAllowSetForegroundWin.Call(^uintptr(0)) // ASFW_ANY: let the running instance take the foreground
+		pPostMessageW.Call(h, wmOpenGUI, 0, 0)
+		return true
+	}
 	b, err := os.ReadFile(filepath.Join(appDir(), "gui.url"))
 	if err != nil || !strings.HasPrefix(string(b), "http://127.0.0.1:") {
 		return false
 	}
-	openURLWindow(string(b))
+	openGUIOnce(string(b))
 	return true
 }
